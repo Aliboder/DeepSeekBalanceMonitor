@@ -1,0 +1,13 @@
+# Build output
+bin/
+obj/
+
+# Codegraph local index
+.codegraph/
+
+# Installer output (distribute via GitHub Releases instead)
+installer/Output/
+
+# IDE
+.vs/
+*.user

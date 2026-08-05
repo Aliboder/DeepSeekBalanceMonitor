@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>DeepSeekBalanceMonitor</AssemblyName>
+    <RootNamespace>DeepSeekBalanceMonitor</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>DeepSeekBalanceMonitor</Authors>
+    <Description>DeepSeek 余额监控 - 实时查看 DeepSeek API 账户余额的桌面小工具</Description>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <DebugType>embedded</DebugType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 允许 .NET 8 SDK 编译 net48 目标（无需安装旧版 targeting pack） -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- JavaScriptSerializer（JSON 序列化）、DPAPI（密钥加密） -->
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+</Project>
