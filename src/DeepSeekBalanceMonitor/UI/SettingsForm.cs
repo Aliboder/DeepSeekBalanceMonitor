@@ -55,6 +55,16 @@ namespace DeepSeekBalanceMonitor.UI
 
             // 底部：打开数据文件夹
             var btnOpenData = new Button { Text = "打开数据文件夹", Width = 130, Height = 30, Location = new Point(14, _y + 6) };
+
+            // 版本信息
+            var lblVersion = new Label
+            {
+                AutoSize = true,
+                Text = "版本 " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version,
+                Location = new Point(310, _y + 12),
+                ForeColor = Color.Gray
+            };
+            Controls.Add(lblVersion);
             btnOpenData.Click += (s, e) =>
             {
                 try

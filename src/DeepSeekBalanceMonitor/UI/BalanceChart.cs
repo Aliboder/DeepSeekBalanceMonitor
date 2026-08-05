@@ -23,20 +23,32 @@ namespace DeepSeekBalanceMonitor.UI
 
         public BalanceChart()
         {
-            // 深色主题（与 Windows 深色系统风格一致）
-            BackColor = Color.FromArgb(0x1E, 0x1E, 0x1E);
+            // 默认深色（跟随系统主题由 SetDark 调整）
+            BackColor = Dark ? Color.FromArgb(0x1E, 0x1E, 0x1E) : Color.White;
             SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint
                 | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
             Font = new Font("Microsoft YaHei UI", 9);
         }
 
-        // 深色主题配色
-        private static readonly Color LineColor = Color.FromArgb(0x4F, 0xA3, 0xFF);      // 亮蓝折线
-        private static readonly Color GridColor = Color.FromArgb(0x36, 0x36, 0x36);       // 网格
-        private static readonly Color TextColor = Color.FromArgb(0xA8, 0xA8, 0xA8);       // 刻度文字
-        private static readonly Color WarnColor = Color.FromArgb(0xE0, 0x6C, 0x75);       // 预警红
-        private static readonly Color LabelBgColor = Color.FromArgb(0x2D, 0x2D, 0x30);    // 标注底
-        private static readonly Color EmptyColor = Color.FromArgb(0x80, 0x80, 0x80);      // 空数据
+        /// <summary>是否深色主题（由统计面板按系统主题设置）。</summary>
+        public bool Dark { get; private set; } = true;
+
+        /// <summary>设置主题并重绘。</summary>
+        public void SetDark(bool dark)
+        {
+            if (Dark == dark) return;
+            Dark = dark;
+            BackColor = dark ? Color.FromArgb(0x1E, 0x1E, 0x1E) : Color.White;
+            Invalidate();
+        }
+
+        // 两套配色（深色 / 浅色）
+        private Color LineColor => Dark ? Color.FromArgb(0x4F, 0xA3, 0xFF) : Color.FromArgb(0x1F, 0x6F, 0xEB);
+        private Color GridColor => Dark ? Color.FromArgb(0x36, 0x36, 0x36) : Color.FromArgb(0xE0, 0xE0, 0xE0);
+        private Color TextColor => Dark ? Color.FromArgb(0xA8, 0xA8, 0xA8) : Color.FromArgb(0x77, 0x77, 0x77);
+        private Color WarnColor => Dark ? Color.FromArgb(0xE0, 0x6C, 0x75) : Color.FromArgb(0xD6, 0x45, 0x45);
+        private Color LabelBgColor => Dark ? Color.FromArgb(0x2D, 0x2D, 0x30) : Color.FromArgb(235, 245, 255);
+        private Color EmptyColor => Dark ? Color.FromArgb(0x80, 0x80, 0x80) : Color.Gray;
 
         /// <summary>更新数据并重绘。</summary>
         public void SetData(IReadOnlyList<BalanceRecord> records, decimal? warnThreshold)

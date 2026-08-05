@@ -1,0 +1,55 @@
+name: Build
+
+# 自动构建：推送代码后自动编译 + 测试 + 生成安装包
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore src/DeepSeekBalanceMonitor/DeepSeekBalanceMonitor.csproj
+
+      - name: Build (Release)
+        run: dotnet build src/DeepSeekBalanceMonitor/DeepSeekBalanceMonitor.csproj -c Release --no-restore
+
+      - name: Run core tests
+        run: |
+          dotnet build tools/CoreTests/CoreTests.csproj -c Release
+          tools/CoreTests/bin/Release/net48/CoreTests.exe
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe" }
+          & $iscc "installer\installer.iss"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeekBalanceMonitor-Setup
+          path: installer/Output/*.exe
+
+      - name: Publish GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/Output/*.exe
+          generate_release_notes: true

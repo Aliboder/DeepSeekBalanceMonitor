@@ -96,8 +96,8 @@ namespace DeepSeekBalanceMonitor.Core
             }
         }
 
-        /// <summary>解析官方响应，取人民币（CNY）余额。</summary>
-        private static BalanceResult ParseBalance(string body)
+        /// <summary>解析官方响应，取人民币（CNY）余额。公开供测试。</summary>
+        public static BalanceResult ParseBalance(string body)
         {
             var doc = Json.Deserialize<BalanceDoc>(body);
             if (doc == null || doc.balance_infos == null || doc.balance_infos.Length == 0)

@@ -28,7 +28,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#MyAppName}
 
 [Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; 使用仓库内自带的中文语言文件（CI 构建可复现，不依赖本地 Inno 安装的语言包）
+Name: "chinesesimplified"; MessagesFile: "Languages\ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标："; Flags: unchecked
