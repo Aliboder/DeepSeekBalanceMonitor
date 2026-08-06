@@ -346,6 +346,8 @@ namespace DeepSeekBalanceMonitor.UI
             _menu.Items.Add(new ToolStripSeparator());
             _menu.Items.Add(_menuExit);
 
+            MenuTheme.Apply(_menu); // 右键菜单跟随系统主题
+
             ContextMenuStrip = _menu;
         }
 
@@ -391,8 +393,19 @@ namespace DeepSeekBalanceMonitor.UI
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(280, 110);
 
+            var dark = Core.SystemTheme.IsDark();
+            if (dark)
+            {
+                BackColor = Color.FromArgb(0x1E, 0x1E, 0x1E);
+                ForeColor = Color.FromArgb(0xDD, 0xDD, 0xDD);
+            }
             var lbl = new Label { Text = prompt, Location = new Point(12, 10), AutoSize = true };
             _input = new TextBox { Location = new Point(12, 36), Width = 256, Text = defaultValue };
+            if (dark)
+            {
+                _input.BackColor = Color.FromArgb(0x2D, 0x2D, 0x30);
+                _input.ForeColor = Color.FromArgb(0xDD, 0xDD, 0xDD);
+            }
             var ok = new Button { Text = "确定", DialogResult = DialogResult.OK, Location = new Point(100, 70), Width = 75 };
             var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, Location = new Point(190, 70), Width = 75 };
 
@@ -403,6 +416,12 @@ namespace DeepSeekBalanceMonitor.UI
             Controls.Add(_input);
             Controls.Add(ok);
             Controls.Add(cancel);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            DarkTitleBar.Apply(Handle); // 标题栏跟随系统主题
         }
     }
 }

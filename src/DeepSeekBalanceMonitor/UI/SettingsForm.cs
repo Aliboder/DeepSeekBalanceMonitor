@@ -23,6 +23,13 @@ namespace DeepSeekBalanceMonitor.UI
         // 布局：窗体级 Y 游标
         private int _y = 12;
 
+        // 深色主题（构造时确定）
+        private readonly bool _dark;
+
+        // 输入控件深色配色（WinForms 输入框默认白底，需显式设置）
+        private static readonly Color DarkInputBg = Color.FromArgb(0x2D, 0x2D, 0x30);
+        private static readonly Color DarkInputFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
+
         public SettingsForm(AppContext ctx)
         {
             _ctx = ctx;
@@ -34,7 +41,19 @@ namespace DeepSeekBalanceMonitor.UI
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(460, 400);
             Font = new Font("Microsoft YaHei UI", 9);
-            BackColor = Color.White;
+
+            // 主题跟随系统：深色系统下设置页也使用深色背景（标题栏已由 DarkTitleBar 处理）
+            _dark = SystemTheme.IsDark();
+            if (_dark)
+            {
+                BackColor = Color.FromArgb(0x1E, 0x1E, 0x1E);
+                ForeColor = Color.FromArgb(0xDD, 0xDD, 0xDD);
+            }
+            else
+            {
+                BackColor = Color.White;
+                ForeColor = Color.FromArgb(0x33, 0x33, 0x33);
+            }
 
             // 关键：关闭自动缩放（与悬浮窗一致）——高分屏下由系统统一缩放，
             // 避免 AutoScale 叠加导致控件错位、文字被按钮截断
@@ -62,7 +81,7 @@ namespace DeepSeekBalanceMonitor.UI
                 AutoSize = true,
                 Text = "版本 " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version,
                 Location = new Point(310, _y + 12),
-                ForeColor = Color.Gray
+                ForeColor = SystemTheme.IsDark() ? Color.FromArgb(0x8A, 0x8A, 0x8A) : Color.Gray
             };
             Controls.Add(lblVersion);
             btnOpenData.Click += (s, e) =>
@@ -97,6 +116,12 @@ namespace DeepSeekBalanceMonitor.UI
             ClientSize = new Size(460, Math.Min(_y + 48, maxClientH));
             // 滚动范围 = 全部内容高度（含底部按钮），屏幕矮时通过滚动条查看
             AutoScrollMinSize = new Size(0, _y + 40);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            DarkTitleBar.Apply(Handle); // 标题栏跟随系统主题
         }
 
         // ============ 布局构建 ============
@@ -171,6 +196,11 @@ namespace DeepSeekBalanceMonitor.UI
                 Location = new Point(110, y), Width = 110, Minimum = 0, Maximum = 99999.99m,
                 DecimalPlaces = 2, Value = Math.Min(_ctx.Config.WarnThreshold, 99999.99m)
             };
+            if (_dark)
+            {
+                numThreshold.BackColor = DarkInputBg;
+                numThreshold.ForeColor = DarkInputFg;
+            }
             g.Controls.Add(numThreshold);
             g.Controls.Add(new Label { Text = "元", AutoSize = true, Location = new Point(228, y + 4) });
             numThreshold.ValueChanged += (s, e) =>
@@ -200,6 +230,11 @@ namespace DeepSeekBalanceMonitor.UI
                 UseSystemPasswordChar = true,
                 Text = _ctx.Config.ApiKey
             };
+            if (_dark)
+            {
+                _keyBox.BackColor = DarkInputBg;
+                _keyBox.ForeColor = DarkInputFg;
+            }
             g.Controls.Add(_keyBox);
             var chkShowKey = new CheckBox { Text = "显示密钥", AutoSize = true, Location = new Point(340, y + 3) };
             chkShowKey.CheckedChanged += (s, e) => _keyBox.UseSystemPasswordChar = !chkShowKey.Checked;
@@ -238,6 +273,11 @@ namespace DeepSeekBalanceMonitor.UI
             {
                 Location = new Point(110, y), Width = 130, DropDownStyle = ComboBoxStyle.DropDownList
             };
+            if (_dark)
+            {
+                cmbInterval.BackColor = DarkInputBg;
+                cmbInterval.ForeColor = DarkInputFg;
+            }
             string[] labels = { "5 秒", "15 秒", "30 秒", "1 分钟", "1 分 30 秒", "2 分钟" };
             for (int i = 0; i < Config.RefreshIntervals.Length; i++)
                 cmbInterval.Items.Add(labels[i]);

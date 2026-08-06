@@ -13,7 +13,6 @@ namespace DeepSeekBalanceMonitor.UI
     public class StatsForm : Form
     {
         private readonly AppContext _ctx;
-        private readonly BalanceChart _chart;
         private readonly DataGridView _grid;
         private readonly Label _lblRecordCount;
         private readonly Dictionary<string, Label> _stats = new Dictionary<string, Label>();
@@ -70,31 +69,38 @@ namespace DeepSeekBalanceMonitor.UI
             Text = "统计 - DeepSeek 余额监控";
             FormBorderStyle = FormBorderStyle.Sizable;
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(680, 560);
-            Size = new Size(760, 620);
+            MinimumSize = new Size(640, 400);
+            Size = new Size(700, 440);
             Font = new Font("Microsoft YaHei UI", 9);
+
+            // 尺寸记忆：恢复上次手动调整过的窗口大小（限制在最小尺寸与屏幕范围内）
+            var saved = _ctx.Config.StatsSize;
+            if (saved.HasValue)
+            {
+                int w = Math.Max(saved.Value.Width, MinimumSize.Width);
+                int h = Math.Max(saved.Value.Height, MinimumSize.Height);
+                var wa = Screen.PrimaryScreen.WorkingArea;
+                Size = new Size(Math.Min(w, wa.Width), Math.Min(h, wa.Height));
+            }
 
             // 主题：跟随系统深浅色
             _dark = SystemTheme.IsDark();
             ApplyTheme();
 
-            // —— 顶部：统计摘要（3 列 x 2 行） ——
+            // —— 顶部：统计摘要（单行 3 格：当前余额 / 今日消费 / 日均消费） ——
             var statsPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 112,
+                Height = 68,
                 ColumnCount = 3,
-                RowCount = 2,
+                RowCount = 1,
                 Padding = new Padding(8, 6, 8, 2),
                 BackColor = _panelColor
             };
             for (int c = 0; c < 3; c++) statsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
-            for (int r = 0; r < 2; r++) statsPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
+            statsPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-            foreach (var key in new[]
-            {
-                "balance", "today", "dailyAvg", "monthlyAvg", "daysLeft", "daysLeft7"
-            })
+            foreach (var key in new[] { "balance", "today", "dailyAvg" })
             {
                 var lbl = new Label
                 {
@@ -110,11 +116,6 @@ namespace DeepSeekBalanceMonitor.UI
                 statsPanel.Controls.Add(lbl);
             }
             Controls.Add(statsPanel);
-
-            // —— 中部：走势图 ——
-            _chart = new BalanceChart { Dock = DockStyle.Top, Height = 280 };
-            _chart.SetDark(_dark);
-            Controls.Add(_chart);
 
             // —— 底部：记录数提示 ——
             var bottom = new Panel { Dock = DockStyle.Bottom, Height = 42, Padding = new Padding(10, 4, 10, 6), BackColor = _bgColor };
@@ -143,7 +144,8 @@ namespace DeepSeekBalanceMonitor.UI
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 EnableHeadersVisualStyles = false,
-                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+                // 表头高度自动适应：高 DPI 缩放下文字不会被上下裁剪（此前 DisableResizing 导致截断）
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
                 GridColor = _gridLineColor
             };
             _grid.ColumnHeadersDefaultCellStyle.BackColor = _headerColor;
@@ -173,6 +175,23 @@ namespace DeepSeekBalanceMonitor.UI
             Shown += (s, e) => RefreshData();
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            DarkTitleBar.Apply(Handle); // 标题栏跟随系统主题
+        }
+
+        /// <summary>用户手动调整窗口大小结束后，记住尺寸供下次启动恢复。</summary>
+        protected override void OnResizeEnd(EventArgs e)
+        {
+            base.OnResizeEnd(e);
+            if (WindowState == FormWindowState.Normal)
+            {
+                _ctx.Config.StatsSize = Size;
+                _ctx.SaveConfig();
+            }
+        }
+
         /// <summary>重新计算并刷新全部统计内容（打开面板/余额更新时调用）。</summary>
         public void RefreshData()
         {
@@ -188,49 +207,26 @@ namespace DeepSeekBalanceMonitor.UI
             if (fp == _dataFingerprint) return;
             _dataFingerprint = fp;
 
-            // —— 统计摘要 ——
+            // —— 统计摘要（当前余额 / 今日消费 / 日均消费） ——
             decimal? balance = monitor.Balance;
             decimal today = history.TodaySpent();
-            decimal avg7 = history.AverageDailySpent(7);
             decimal total = history.TotalSpent();
 
             // 整体日均：从首条记录到今天的天数
             decimal avgAll = 0;
-            int daysAll = 0;
             if (records.Count > 0)
             {
-                daysAll = Math.Max(1, (DateTime.Today - records[0].Time.Date).Days + 1);
+                int daysAll = Math.Max(1, (DateTime.Today - records[0].Time.Date).Days + 1);
                 avgAll = total / daysAll;
             }
-            // 月均：自然月数（至少 1）
-            int months = 1;
-            if (records.Count > 0)
-                months = Math.Max(1, (DateTime.Today.Year - records[0].Time.Year) * 12
-                    + (DateTime.Today.Month - records[0].Time.Month) + 1);
-            decimal avgMonth = total / months;
 
-            // 预计可用天数
-            string daysLeft = "--";
-            if (balance.HasValue && avgAll > 0) daysLeft = ((int)Math.Floor(balance.Value / avgAll)).ToString();
-            string daysLeft7 = "--";
-            if (balance.HasValue && avg7 > 0) daysLeft7 = ((int)Math.Floor(balance.Value / avg7)).ToString();
-
-            // 标题尽量简短：高 DPI 缩放（150%）下格子宽度有限，长标题会被裁剪
             SetStat("balance", "当前余额", balance.HasValue ? "¥ " + balance.Value.ToString("F2") : "--");
             SetStat("today", "今日消费", "¥ " + today.ToString("F2"));
             SetStat("dailyAvg", "日均消费", "¥ " + avgAll.ToString("F2"));
-            SetStat("monthlyAvg", "月均消费", "¥ " + avgMonth.ToString("F2"));
-            SetStat("daysLeft", "预计可用天数", daysLeft);
-            // 近7天无历史时日均=0、可用天数=--，显示友好文案避免"¥0.00 / --天"式拥挤
-            SetStat("daysLeft7", "近7天日均",
-                avg7 > 0 ? "¥ " + avg7.ToString("F2") + " / " + daysLeft7 + "天" : "暂无数据");
-
-            // —— 走势图 ——
-            _chart.SetData(records, cfg.WarnThreshold);
 
             // —— 历史记录表（倒序，变动红绿标注；仅渲染最近 GridMaxRows 条） ——
             _lblRecordCount.Text = records.Count > GridMaxRows
-                ? "共 " + records.Count + " 条记录（表格仅显示最近 " + GridMaxRows + " 条，导出含全部）"
+                ? "共 " + records.Count + " 条记录（表格仅显示最近 " + GridMaxRows + " 条）"
                 : "共 " + records.Count + " 条记录";
 
             _grid.Rows.Clear();

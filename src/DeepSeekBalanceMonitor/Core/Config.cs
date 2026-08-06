@@ -47,5 +47,8 @@ namespace DeepSeekBalanceMonitor.Core
 
         /// <summary>悬浮窗位置（屏幕坐标），null 表示默认位置。</summary>
         public Point? FloatPosition { get; set; } = null;
+
+        /// <summary>统计窗口尺寸，null 表示默认尺寸。</summary>
+        public Size? StatsSize { get; set; } = null;
     }
 }

@@ -106,6 +106,8 @@ namespace DeepSeekBalanceMonitor.Core
             public bool TopMost { get; set; }
             public int? FloatX { get; set; }
             public int? FloatY { get; set; }
+            public int? StatsW { get; set; }
+            public int? StatsH { get; set; }
 
             public static ConfigDocument FromConfig(Config c) => new ConfigDocument
             {
@@ -121,7 +123,9 @@ namespace DeepSeekBalanceMonitor.Core
                 LockMode = c.LockMode,
                 TopMost = c.TopMost,
                 FloatX = c.FloatPosition?.X,
-                FloatY = c.FloatPosition?.Y
+                FloatY = c.FloatPosition?.Y,
+                StatsW = c.StatsSize?.Width,
+                StatsH = c.StatsSize?.Height
             };
 
             public Config ToConfig() => new Config
@@ -138,7 +142,10 @@ namespace DeepSeekBalanceMonitor.Core
                 TopMost = TopMost,
                 FloatPosition = (FloatX.HasValue && FloatY.HasValue)
                     ? new System.Drawing.Point(FloatX.Value, FloatY.Value)
-                    : (System.Drawing.Point?)null
+                    : (System.Drawing.Point?)null,
+                StatsSize = (StatsW.HasValue && StatsH.HasValue)
+                    ? new System.Drawing.Size(StatsW.Value, StatsH.Value)
+                    : (System.Drawing.Size?)null
             };
 
             private static int Normalize(int v, int min, int max, int dflt)

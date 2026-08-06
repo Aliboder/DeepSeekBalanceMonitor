@@ -103,6 +103,8 @@ namespace DeepSeekBalanceMonitor.UI
 
             _icon.ContextMenuStrip = _menu;
             _icon.MouseClick += OnMouseClick;
+
+            MenuTheme.Apply(_menu); // 右键菜单跟随系统主题
         }
 
         private void OnMouseClick(object sender, MouseEventArgs e)
@@ -209,22 +211,45 @@ namespace DeepSeekBalanceMonitor.UI
 
         // ============ 图标绘制 ============
 
-        /// <summary>绘制圆形 D 图标（32x32，托盘自动缩放）。</summary>
-        private static Icon CreateTrayIcon(Color color)
+        /// <summary>
+        /// 绘制托盘图标：深色渐变圆 + 状态色 ¥ 符号（48x48 高清，托盘缩放不模糊）。
+        /// ¥ 寓意"余额"，状态色（绿/红/橙/靛蓝）表达当前状态。
+        /// </summary>
+        private static Icon CreateTrayIcon(Color statusColor)
         {
-            using (var bmp = new Bitmap(32, 32))
+            const int size = 48;
+            using (var bmp = new Bitmap(size, size))
             {
                 using (var g = Graphics.FromImage(bmp))
                 {
                     g.SmoothingMode = SmoothingMode.AntiAlias;
-                    using (var brush = new SolidBrush(color))
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+
+                    // 深色渐变圆底（中心亮、边缘暗，有立体感）
+                    var rect = new Rectangle(1, 1, size - 2, size - 2);
+                    using (var path = new GraphicsPath())
                     {
-                        g.FillEllipse(brush, 1, 1, 30, 30);
+                        path.AddEllipse(rect);
+                        using (var brush = new PathGradientBrush(path)
+                        {
+                            CenterColor = Color.FromArgb(0x4A, 0x4A, 0x4A),
+                            SurroundColors = new[] { Color.FromArgb(0x18, 0x18, 0x18) }
+                        })
+                        {
+                            g.FillPath(brush, path);
+                        }
+                        // 细描边增强轮廓
+                        using (var pen = new Pen(Color.FromArgb(0x55, 0x55, 0x55), 1f))
+                        {
+                            g.DrawPath(pen, path);
+                        }
                     }
-                    using (var f = new Font("Arial", 17, FontStyle.Bold))
+
+                    // 状态色 ¥ 符号
+                    using (var f = new Font("Segoe UI", 24f, FontStyle.Bold, GraphicsUnit.Pixel))
                     using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                     {
-                        g.DrawString("D", f, Brushes.White, new RectangleF(1, 1, 30, 30), sf);
+                        g.DrawString("¥", f, new SolidBrush(statusColor), new RectangleF(0, -1, size, size), sf);
                     }
                 }
                 IntPtr hIcon = bmp.GetHicon();
