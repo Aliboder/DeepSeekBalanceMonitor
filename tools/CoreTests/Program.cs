@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using DeepSeekBalanceMonitor.Core;
 
 namespace CoreTests
@@ -25,6 +26,7 @@ namespace CoreTests
             TestDeepSeekProvider();
             TestOtherProviders();
             TestConfigMigration();
+            TestBalanceMonitor();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -215,6 +217,61 @@ namespace CoreTests
                 Assert(loaded2.ActiveAccountId == "b", "ActiveAccountId 往返");
                 Assert(!File.ReadAllText(path).Contains("k1") && !File.ReadAllText(path).Contains("k2"),
                     "明文密钥不落盘");
+            }
+            finally { try { File.Delete(path); } catch { } }
+        }
+
+        // ============ BalanceMonitor（多实例） ============
+
+        /// <summary>假 provider：固定余额，记录最近查询的 key。</summary>
+        private class FakeProvider : IBalanceProvider
+        {
+            public string Id => "fake";
+            public string DisplayName => "Fake";
+            public string BaseUrl => "http://fake";
+            public decimal Value = 50m;
+            public string LastKey;
+
+            public Task<AccountBalance> GetBalanceAsync(string apiKey)
+            {
+                LastKey = apiKey;
+                return Task.FromResult(new AccountBalance { IsAvailable = true, Remaining = Value, Currency = "CNY" });
+            }
+        }
+
+        private class ThrowingProvider : IBalanceProvider
+        {
+            public string Id => "bad"; public string DisplayName => "Bad"; public string BaseUrl => "http://bad";
+            public Task<AccountBalance> GetBalanceAsync(string apiKey)
+                => throw new BalanceQueryException(QueryErrorKind.Network, "超时");
+        }
+
+        private static void TestBalanceMonitor()
+        {
+            Console.WriteLine("-- BalanceMonitor（多实例） --");
+            var path = Path.Combine(Path.GetTempPath(), "CoreTests-" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                var fp = new FakeProvider { Value = 100m };
+                var acc = new AccountConfig { Id = "acc1", Name = "一号", ProviderId = "fake", ApiKey = "k1", WarnThreshold = 30m };
+                var mon = new BalanceMonitor(fp, new HistoryStore(path), acc);
+                mon.RefreshNowAsync().Wait();
+
+                Assert(mon.Balance == 100m && mon.Status == BalanceStatus.Normal, "查询成功且余额充足为 Normal");
+                Assert(mon.AccountId == "acc1" && mon.AccountName == "一号", "账户信息透出");
+                Assert(fp.LastKey == "k1", "使用账户的 API Key");
+
+                // 阈值：余额低于阈值 → Low
+                fp.Value = 10m;
+                mon.SetWarnThreshold(30m);
+                mon.RefreshNowAsync().Wait();
+                Assert(mon.Status == BalanceStatus.Low, "余额低于阈值为 Low");
+
+                // 错误：provider 抛异常 → Error，保留最后余额
+                var bad = new ThrowingProvider();
+                var mon2 = new BalanceMonitor(bad, new HistoryStore(path), new AccountConfig { Id = "acc2", ApiKey = "k2" });
+                mon2.RefreshNowAsync().Wait();
+                Assert(mon2.Status == BalanceStatus.Error && mon2.ConsecutiveFailures == 1, "查询失败为 Error");
             }
             finally { try { File.Delete(path); } catch { } }
         }

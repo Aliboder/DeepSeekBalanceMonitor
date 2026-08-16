@@ -14,18 +14,17 @@ namespace DeepSeekBalanceMonitor.Core
 
     /// <summary>
     /// 轮询调度器 + 状态机：按配置间隔查询余额，维护当前状态，通过事件通知 UI。
+    /// 一个实例监控一个账户（provider + account）。
     /// 查询串行执行（上一请求未完成则跳过本轮），连续失败自动退避，成功即恢复。
     /// </summary>
     public class BalanceMonitor : IDisposable
     {
-        private readonly DeepSeekApiClient _api;
+        private readonly IBalanceProvider _provider;
         private readonly HistoryStore _history;
+        private readonly AccountConfig _account;
         private readonly Timer _timer;
         private readonly object _lock = new object();
 
-        private string _apiKey;
-        private string _accountId = "";
-        private decimal _warnThreshold;
         private bool _busy;
         private bool _disposed;
         private int _configuredInterval = 30;
@@ -48,16 +47,24 @@ namespace DeepSeekBalanceMonitor.Core
         /// <summary>连续失败次数。</summary>
         public int ConsecutiveFailures { get; private set; }
 
-        public BalanceMonitor(DeepSeekApiClient api, HistoryStore history, string apiKey, decimal warnThreshold)
+        /// <summary>被监控账户 Id。</summary>
+        public string AccountId => _account.Id;
+
+        /// <summary>被监控账户名称。</summary>
+        public string AccountName => _account.Name;
+
+        /// <summary>当前供应商显示名。</summary>
+        public string ProviderDisplayName => _provider.DisplayName;
+
+        public BalanceMonitor(IBalanceProvider provider, HistoryStore history, AccountConfig account)
         {
-            _api = api;
+            _provider = provider;
             _history = history;
-            _apiKey = apiKey ?? "";
-            _warnThreshold = warnThreshold;
+            _account = account;
 
             _timer = new Timer();
             _timer.Tick += OnTick;
-            _timer.Interval = GetEffectiveIntervalMs(30);
+            _timer.Interval = 30000;
         }
 
         /// <summary>启动轮询并立即查询一次。</summary>
@@ -95,14 +102,14 @@ namespace DeepSeekBalanceMonitor.Core
         /// <summary>修改预警阈值，即时生效。</summary>
         public void SetWarnThreshold(decimal threshold)
         {
-            _warnThreshold = threshold;
+            _account.WarnThreshold = threshold;
             ReevaluateStatus();
         }
 
         /// <summary>更新 API 密钥，并立即查询一次。</summary>
         public void SetApiKey(string apiKey)
         {
-            _apiKey = apiKey ?? "";
+            _account.ApiKey = apiKey ?? "";
             _ = RefreshAsync();
         }
 
@@ -111,6 +118,9 @@ namespace DeepSeekBalanceMonitor.Core
         {
             _ = RefreshAsync();
         }
+
+        /// <summary>立即查询一次，返回可等待的 Task。</summary>
+        public Task RefreshNowAsync() => RefreshAsync();
 
         private async Task RefreshAsync()
         {
@@ -123,16 +133,18 @@ namespace DeepSeekBalanceMonitor.Core
 
             try
             {
-                var result = await _api.GetBalanceAsync(_apiKey).ConfigureAwait(true);
+                var result = await _provider.GetBalanceAsync(_account.ApiKey).ConfigureAwait(true);
 
-                Balance = result.TotalBalance;
-                LastSuccessTime = result.Time;
+                var now = DateTime.Now;
+                var stored = result.Remaining ?? result.Total ?? 0m;
+                Balance = result.Remaining;
+                LastSuccessTime = now;
                 ErrorMessage = null;
                 ConsecutiveFailures = 0;
-                _history.Append(_accountId, result.TotalBalance, result.Time);
+                _history.Append(_account.Id, stored, now);
                 ReevaluateStatus();
 
-                Logger.Current?.Info("余额查询成功: ¥" + result.TotalBalance.ToString("F2"));
+                Logger.Current?.Info("余额查询成功: ¥" + stored.ToString("F2"));
 
                 // 成功后恢复为配置的轮询间隔
                 _timer.Interval = GetEffectiveIntervalMs(_configuredInterval);
@@ -162,7 +174,7 @@ namespace DeepSeekBalanceMonitor.Core
         {
             if (Balance.HasValue)
             {
-                Status = Balance.Value < _warnThreshold ? BalanceStatus.Low : BalanceStatus.Normal;
+                Status = Balance.Value < _account.WarnThreshold ? BalanceStatus.Low : BalanceStatus.Normal;
             }
             else
             {
