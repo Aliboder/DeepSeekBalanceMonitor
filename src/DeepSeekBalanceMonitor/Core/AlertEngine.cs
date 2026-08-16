@@ -31,12 +31,14 @@ namespace DeepSeekBalanceMonitor.Core
             {
                 if (_initialized && !_wasLow && _ctx.Config.NotifyLowBalance && m.Balance.HasValue)
                 {
+                    var threshold = _ctx.Monitor != null && _ctx.Monitor.Balance.HasValue
+                        ? _ctx.Config.ActiveAccount?.WarnThreshold ?? 10m : 10m;
                     _ctx.Notify.Show("⚠ 余额不足",
                         "DeepSeek 余额仅剩 ¥" + m.Balance.Value.ToString("F2")
-                        + "（预警阈值: ¥" + _ctx.Config.WarnThreshold.ToString("F2") + "）",
+                        + "（预警阈值: ¥" + threshold.ToString("F2") + "）",
                         ToolTipIcon.Warning);
                     Logger.Current?.Warn("告警：余额不足 ¥" + m.Balance.Value.ToString("F2")
-                        + "，阈值 ¥" + _ctx.Config.WarnThreshold.ToString("F2"));
+                        + "，阈值 ¥" + threshold.ToString("F2"));
                 }
                 _wasLow = true;
             }

@@ -45,7 +45,10 @@ namespace DeepSeekBalanceMonitor
             Api = new DeepSeekApiClient();
 
             // —— 轮询调度 + 悬浮窗 + 托盘 ——
-            Monitor = new BalanceMonitor(Api, History, Config.ApiKey, Config.WarnThreshold);
+            var act = Config.ActiveAccount;
+            Monitor = new BalanceMonitor(Api, History,
+                act == null ? "" : act.ApiKey,
+                act == null ? 10m : act.WarnThreshold);
             FloatWindow = new FloatingWindow(this);
             Monitor.StateChanged += (s, e) =>
             {

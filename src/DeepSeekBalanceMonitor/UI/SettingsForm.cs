@@ -194,7 +194,7 @@ namespace DeepSeekBalanceMonitor.UI
             var numThreshold = new NumericUpDown
             {
                 Location = new Point(110, y), Width = 110, Minimum = 0, Maximum = 99999.99m,
-                DecimalPlaces = 2, Value = Math.Min(_ctx.Config.WarnThreshold, 99999.99m)
+                DecimalPlaces = 2, Value = Math.Min(_ctx.Config.ActiveAccount?.WarnThreshold ?? 10m, 99999.99m)
             };
             if (_dark)
             {
@@ -205,7 +205,8 @@ namespace DeepSeekBalanceMonitor.UI
             g.Controls.Add(new Label { Text = "元", AutoSize = true, Location = new Point(228, y + 4) });
             numThreshold.ValueChanged += (s, e) =>
             {
-                _ctx.Config.WarnThreshold = numThreshold.Value;
+                var act = _ctx.Config.ActiveAccount;
+                if (act != null) act.WarnThreshold = numThreshold.Value;
                 _ctx.Monitor.SetWarnThreshold(numThreshold.Value); // 悬浮窗颜色立即更新
                 MarkDirty();
             };
@@ -228,7 +229,7 @@ namespace DeepSeekBalanceMonitor.UI
             {
                 Location = new Point(14, y), Width = 320,
                 UseSystemPasswordChar = true,
-                Text = _ctx.Config.ApiKey
+                Text = _ctx.Config.ActiveAccount?.ApiKey ?? ""
             };
             if (_dark)
             {
@@ -366,7 +367,8 @@ namespace DeepSeekBalanceMonitor.UI
                     "确认密钥", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
-            _ctx.Config.ApiKey = key;
+            var act = _ctx.Config.ActiveAccount;
+            if (act != null) act.ApiKey = key;
             _ctx.SaveConfig();
             _ctx.Monitor.SetApiKey(key); // 立即用新密钥查询，不等下一个刷新周期
             SetKeyStatus("已应用，正在刷新余额...", false);
@@ -379,7 +381,8 @@ namespace DeepSeekBalanceMonitor.UI
                     "确认清空", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
-            _ctx.Config.ApiKey = "";
+            var act = _ctx.Config.ActiveAccount;
+            if (act != null) act.ApiKey = "";
             _ctx.SaveConfig();
             _ctx.Monitor.SetApiKey("");
             _keyBox.Text = "";

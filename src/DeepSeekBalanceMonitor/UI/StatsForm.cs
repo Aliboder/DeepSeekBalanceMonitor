@@ -203,7 +203,7 @@ namespace DeepSeekBalanceMonitor.UI
             // 防抖：数据未变化（余额、最后记录、阈值均相同）时不重建界面，
             // 避免每 30 秒轮询时表格反复全量重建（闪烁/开销）
             string fp = (records.Count > 0 ? records[records.Count - 1].Time.Ticks + "|" + records[records.Count - 1].Balance : "e")
-                + "|" + monitor.Balance + "|" + cfg.WarnThreshold;
+                + "|" + monitor.Balance + "|" + (cfg.ActiveAccount?.WarnThreshold ?? 10m);
             if (fp == _dataFingerprint) return;
             _dataFingerprint = fp;
 

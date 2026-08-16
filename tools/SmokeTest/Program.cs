@@ -58,7 +58,15 @@ namespace SmokeTest
 
                 var svc = new ConfigService(System.IO.Path.Combine(dataRoot, "设置.json"));
                 var cfg = svc.Load();
-                cfg.ApiKey = key;
+                if (cfg.ActiveAccount == null)
+                {
+                    cfg.Accounts.Add(new AccountConfig { Name = "默认账户", ProviderId = "deepseek", ApiKey = key });
+                    cfg.ActiveAccountId = cfg.Accounts[0].Id;
+                }
+                else
+                {
+                    cfg.ActiveAccount.ApiKey = key;
+                }
                 svc.Save(cfg);
                 Console.WriteLine("[配置] 密钥已写入 " + dataRoot + "\\设置.json");
                 return 0;

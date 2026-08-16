@@ -24,6 +24,7 @@ namespace CoreTests
             TestHistoryStore();
             TestDeepSeekProvider();
             TestOtherProviders();
+            TestConfigMigration();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -160,6 +161,57 @@ namespace CoreTests
             {
                 try { File.Delete(path); } catch { }
             }
+        }
+
+        // ============ 配置迁移 ============
+
+        private static void TestConfigMigration()
+        {
+            Console.WriteLine("-- 配置迁移 --");
+            var path = Path.Combine(Path.GetTempPath(), "CoreTests-" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                // 先存一份新格式（含一个账户），把账户密文提出来
+                var svc = new ConfigService(path);
+                var cfg = new Config();
+                cfg.Accounts.Add(new AccountConfig
+                {
+                    Id = "acc1", Name = "默认账户", ProviderId = "deepseek",
+                    ApiKey = "sk-test-migrate", WarnThreshold = 20m
+                });
+                svc.Save(cfg);
+
+                // 用反射调私有 EncryptKey 构造旧格式密文
+                var enc = typeof(ConfigService).GetMethod("EncryptKey",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { "sk-test-migrate" });
+
+                // 写旧格式：只有 ApiKeyEncrypted + WarnThreshold，无 Accounts
+                var legacy = "{\"WarnThreshold\":20,\"ApiKeyEncrypted\":\"" + enc + "\",\"FontSize\":20}";
+                File.WriteAllText(path, legacy);
+
+                var loaded = new ConfigService(path).Load();
+                Assert(loaded.Accounts.Count == 1, "旧格式迁移出 1 个账户");
+                Assert(loaded.Accounts[0].ProviderId == "deepseek", "迁移账户为 deepseek");
+                Assert(loaded.Accounts[0].ApiKey == "sk-test-migrate", "迁移保留密钥明文");
+                Assert(loaded.Accounts[0].WarnThreshold == 20m, "迁移保留阈值");
+                Assert(loaded.ActiveAccountId == loaded.Accounts[0].Id, "ActiveAccountId 指向迁移账户");
+
+                // 新格式往返
+                var svc2 = new ConfigService(path);
+                var cfg2 = new Config();
+                cfg2.Accounts.Add(new AccountConfig { Id = "a", Name = "A", ProviderId = "openrouter", ApiKey = "k1" });
+                cfg2.Accounts.Add(new AccountConfig { Id = "b", Name = "B", ProviderId = "zai", ApiKey = "k2" });
+                cfg2.ActiveAccountId = "b";
+                svc2.Save(cfg2);
+                var loaded2 = new ConfigService(path).Load();
+                Assert(loaded2.Accounts.Count == 2 && loaded2.Accounts[0].ApiKey == "k1" && loaded2.Accounts[1].ApiKey == "k2",
+                    "多账户往返");
+                Assert(loaded2.ActiveAccountId == "b", "ActiveAccountId 往返");
+                Assert(!File.ReadAllText(path).Contains("k1") && !File.ReadAllText(path).Contains("k2"),
+                    "明文密钥不落盘");
+            }
+            finally { try { File.Delete(path); } catch { } }
         }
 
         // ============ 微型断言 ============

@@ -1,8 +1,28 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 
 namespace DeepSeekBalanceMonitor.Core
 {
+    /// <summary>一个被监控的账户（供应商 + 密钥 + 独立预警阈值）。</summary>
+    public class AccountConfig
+    {
+        /// <summary>稳定主键（Guid）。</summary>
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+        /// <summary>自定义名称（如「工作号」）。</summary>
+        public string Name { get; set; } = "";
+
+        /// <summary>供应商 Id（对应 ProviderRegistry）。</summary>
+        public string ProviderId { get; set; } = "deepseek";
+
+        /// <summary>API 密钥（内存明文，落盘前由 ConfigService 加密）。</summary>
+        public string ApiKey { get; set; } = "";
+
+        /// <summary>该账户余额预警阈值。</summary>
+        public decimal WarnThreshold { get; set; } = 10m;
+    }
+
     /// <summary>
     /// 软件全部设置项。保存为「我的文档\DeepSeek余额监控\设置.json」。
     /// 所有字段均有默认值，改动即时生效。
@@ -21,17 +41,24 @@ namespace DeepSeekBalanceMonitor.Core
         /// <summary>鼠标离开时悬浮窗变暗到的透明度（10~100，百分比）。</summary>
         public int IdleOpacity { get; set; } = 45;
 
-        /// <summary>余额预警阈值（元）。</summary>
-        public decimal WarnThreshold { get; set; } = 10m;
-
         /// <summary>余额不足时是否弹出通知。</summary>
         public bool NotifyLowBalance { get; set; } = true;
 
         /// <summary>消费突增时是否弹出通知。</summary>
         public bool NotifySurge { get; set; } = true;
 
-        /// <summary>API 密钥（保存在内存中的明文，落盘前由 ConfigService 加密）。</summary>
-        public string ApiKey { get; set; } = "";
+        /// <summary>全部被监控账户。</summary>
+        public List<AccountConfig> Accounts { get; set; } = new List<AccountConfig>();
+
+        /// <summary>悬浮窗当前显示的账户 Id。</summary>
+        public string ActiveAccountId { get; set; } = "";
+
+        /// <summary>当前账户（找不到时返回 null）。</summary>
+        [System.Web.Script.Serialization.ScriptIgnore]
+        public AccountConfig ActiveAccount
+        {
+            get { return Accounts.Find(a => a.Id == ActiveAccountId) ?? (Accounts.Count > 0 ? Accounts[0] : null); }
+        }
 
         /// <summary>刷新间隔（秒），取 RefreshIntervals 中的值。</summary>
         public int RefreshIntervalSeconds { get; set; } = 30;

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web.Script.Serialization;
@@ -7,8 +9,8 @@ using System.Web.Script.Serialization;
 namespace DeepSeekBalanceMonitor.Core
 {
     /// <summary>
-    /// 配置读写：JSON 文件存储，API 密钥使用 Windows DPAPI 加密。
-    /// 文件结构：{ ..., "ApiKeyEncrypted": "base64..." }
+    /// 配置读写：JSON 文件存储，每个账户的 API 密钥使用 Windows DPAPI 加密。
+    /// 文件结构：{ ..., "Accounts": [{ "ApiKeyEncrypted": "base64..." }] }
     /// </summary>
     public class ConfigService
     {
@@ -21,7 +23,7 @@ namespace DeepSeekBalanceMonitor.Core
             _path = path;
         }
 
-        /// <summary>加载配置；文件不存在或损坏时返回默认配置。</summary>
+        /// <summary>加载配置；文件不存在或损坏时返回默认配置。旧格式（单密钥）自动迁移为新格式。</summary>
         public Config Load()
         {
             lock (_lock)
@@ -35,7 +37,24 @@ namespace DeepSeekBalanceMonitor.Core
                         if (doc != null)
                         {
                             var cfg = doc.ToConfig();
-                            cfg.ApiKey = DecryptKey(doc.ApiKeyEncrypted);
+
+                            // 旧版本迁移：有旧密钥且无账户 → 生成默认 DeepSeek 账户
+                            if ((doc.Accounts == null || doc.Accounts.Count == 0)
+                                && !string.IsNullOrEmpty(doc.ApiKeyEncrypted))
+                            {
+                                var acc = new AccountConfig
+                                {
+                                    Name = "默认账户",
+                                    ProviderId = "deepseek",
+                                    ApiKey = DecryptKey(doc.ApiKeyEncrypted),
+                                    WarnThreshold = doc.WarnThreshold < 0 ? 10m : doc.WarnThreshold
+                                };
+                                cfg.Accounts.Add(acc);
+                                cfg.ActiveAccountId = acc.Id;
+                                Save(cfg); // 立即落盘为新格式
+                                return cfg;
+                            }
+
                             return cfg;
                         }
                     }
@@ -48,7 +67,7 @@ namespace DeepSeekBalanceMonitor.Core
             }
         }
 
-        /// <summary>保存配置（密钥自动加密）。</summary>
+        /// <summary>保存配置（各账户密钥自动加密）。</summary>
         public void Save(Config cfg)
         {
             lock (_lock)
@@ -56,7 +75,6 @@ namespace DeepSeekBalanceMonitor.Core
                 try
                 {
                     var doc = ConfigDocument.FromConfig(cfg);
-                    doc.ApiKeyEncrypted = EncryptKey(cfg.ApiKey);
                     File.WriteAllText(_path, Json.Serialize(doc));
                 }
                 catch (Exception ex)
@@ -108,45 +126,87 @@ namespace DeepSeekBalanceMonitor.Core
             public int? FloatY { get; set; }
             public int? StatsW { get; set; }
             public int? StatsH { get; set; }
+            // 保留旧字段 ApiKeyEncrypted / WarnThreshold 用于迁移判断
+            public List<AccountItem> Accounts { get; set; } = new List<AccountItem>();
+            // 当前显示的账户 Id
+            public string ActiveAccountId { get; set; } = "";
 
-            public static ConfigDocument FromConfig(Config c) => new ConfigDocument
+            public class AccountItem
             {
-                FontSize = c.FontSize,
-                Opacity = c.Opacity,
-                IdleOpacity = c.IdleOpacity,
-                WarnThreshold = c.WarnThreshold,
-                NotifyLowBalance = c.NotifyLowBalance,
-                NotifySurge = c.NotifySurge,
-                ApiKeyEncrypted = "",
-                RefreshIntervalSeconds = c.RefreshIntervalSeconds,
-                AutoStart = c.AutoStart,
-                LockMode = c.LockMode,
-                TopMost = c.TopMost,
-                FloatX = c.FloatPosition?.X,
-                FloatY = c.FloatPosition?.Y,
-                StatsW = c.StatsSize?.Width,
-                StatsH = c.StatsSize?.Height
-            };
+                public string Id { get; set; }
+                public string Name { get; set; }
+                public string ProviderId { get; set; }
+                public string ApiKeyEncrypted { get; set; } = "";
+                public decimal WarnThreshold { get; set; }
+            }
 
-            public Config ToConfig() => new Config
+            public static ConfigDocument FromConfig(Config c)
             {
-                FontSize = Normalize(FontSize, 12, 48, 28),
-                Opacity = Normalize(Opacity, 30, 100, 90),
-                IdleOpacity = Normalize(IdleOpacity, 10, 100, 45),
-                WarnThreshold = WarnThreshold < 0 ? 10m : WarnThreshold,
-                NotifyLowBalance = NotifyLowBalance,
-                NotifySurge = NotifySurge,
-                RefreshIntervalSeconds = Normalize(RefreshIntervalSeconds, 5, 120, 30),
-                AutoStart = AutoStart,
-                LockMode = LockMode,
-                TopMost = TopMost,
-                FloatPosition = (FloatX.HasValue && FloatY.HasValue)
-                    ? new System.Drawing.Point(FloatX.Value, FloatY.Value)
-                    : (System.Drawing.Point?)null,
-                StatsSize = (StatsW.HasValue && StatsH.HasValue)
-                    ? new System.Drawing.Size(StatsW.Value, StatsH.Value)
-                    : (System.Drawing.Size?)null
-            };
+                var doc = new ConfigDocument
+                {
+                    FontSize = c.FontSize,
+                    Opacity = c.Opacity,
+                    IdleOpacity = c.IdleOpacity,
+                    WarnThreshold = 0m,
+                    NotifyLowBalance = c.NotifyLowBalance,
+                    NotifySurge = c.NotifySurge,
+                    ApiKeyEncrypted = "",
+                    RefreshIntervalSeconds = c.RefreshIntervalSeconds,
+                    AutoStart = c.AutoStart,
+                    LockMode = c.LockMode,
+                    TopMost = c.TopMost,
+                    FloatX = c.FloatPosition?.X,
+                    FloatY = c.FloatPosition?.Y,
+                    StatsW = c.StatsSize?.Width,
+                    StatsH = c.StatsSize?.Height
+                };
+                doc.Accounts = (c.Accounts ?? new List<AccountConfig>()).Select(a => new AccountItem
+                {
+                    Id = a.Id,
+                    Name = a.Name,
+                    ProviderId = a.ProviderId,
+                    ApiKeyEncrypted = EncryptKey(a.ApiKey),
+                    WarnThreshold = a.WarnThreshold
+                }).ToList();
+                doc.ActiveAccountId = c.ActiveAccountId;
+                return doc;
+            }
+
+            public Config ToConfig()
+            {
+                var cfg = new Config
+                {
+                    FontSize = Normalize(FontSize, 12, 48, 28),
+                    Opacity = Normalize(Opacity, 30, 100, 90),
+                    IdleOpacity = Normalize(IdleOpacity, 10, 100, 45),
+                    NotifyLowBalance = NotifyLowBalance,
+                    NotifySurge = NotifySurge,
+                    RefreshIntervalSeconds = Normalize(RefreshIntervalSeconds, 5, 120, 30),
+                    AutoStart = AutoStart,
+                    LockMode = LockMode,
+                    TopMost = TopMost,
+                    FloatPosition = (FloatX.HasValue && FloatY.HasValue)
+                        ? new System.Drawing.Point(FloatX.Value, FloatY.Value)
+                        : (System.Drawing.Point?)null,
+                    StatsSize = (StatsW.HasValue && StatsH.HasValue)
+                        ? new System.Drawing.Size(StatsW.Value, StatsH.Value)
+                        : (System.Drawing.Size?)null
+                };
+                cfg.Accounts = (Accounts ?? new List<AccountItem>())
+                    .Where(a => !string.IsNullOrEmpty(a.Id))
+                    .Select(a => new AccountConfig
+                    {
+                        Id = a.Id,
+                        Name = string.IsNullOrEmpty(a.Name) ? a.ProviderId : a.Name,
+                        ProviderId = string.IsNullOrEmpty(a.ProviderId) ? "deepseek" : a.ProviderId,
+                        ApiKey = DecryptKey(a.ApiKeyEncrypted),
+                        WarnThreshold = a.WarnThreshold < 0 ? 10m : a.WarnThreshold
+                    }).ToList();
+                cfg.ActiveAccountId = ActiveAccountId;
+                if (string.IsNullOrEmpty(cfg.ActiveAccountId) && cfg.Accounts.Count > 0)
+                    cfg.ActiveAccountId = cfg.Accounts[0].Id;
+                return cfg;
+            }
 
             private static int Normalize(int v, int min, int max, int dflt)
             {
