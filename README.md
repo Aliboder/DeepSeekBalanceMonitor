@@ -4,8 +4,10 @@
 
 ## 功能一览
 
-- **桌面悬浮窗**：始终置顶显示当前余额，颜色随余额状态变化（绿=充足 / 红=不足 / 橙=查询异常），支持拖动、点击穿透、悬停增亮
+- **桌面悬浮窗**：始终置顶显示当前余额，颜色随余额状态变化（绿=充足 / 红=不足 / 橙=查询异常），支持拖动、点击穿透、悬停增亮，顶部小字显示当前账户名
 - **系统托盘**：常驻任务栏通知区，图标颜色反映余额状态，悬停即可查看余额
+- **多供应商支持**：DeepSeek / OpenRouter / Moonshot / Z.ai 四家余额接口（订阅型额度如 OpenCode Go 暂不支持）
+- **多账户管理**：可配置多个账户并行监控（同供应商多个 Key 也行），设置窗口统一管理，托盘「账户」子菜单一键切换当前账户，各账户独立预警阈值、历史记录与统计
 - **智能告警**：
   - 余额低于预警阈值时通知（仅在临界点提醒一次）
   - 今日消费超过近 7 天日均 3 倍时提醒「消费突增」（每天最多一次）
@@ -19,20 +21,20 @@
 
 1. 运行安装包，按提示完成安装。
 2. 打开软件后，右键悬浮窗（或托盘图标）→ **设置**。
-3. 在「API 密钥」处粘贴你的 DeepSeek API Key（在 [platform.deepseek.com](https://platform.deepseek.com) → API Keys 页面创建），点击**测试**验证，再点**应用**。
-4. 回到桌面即可看到实时余额，悬浮窗可拖动到任意位置（位置会被记住）。
+3. 在「账户」区添加账户：选择供应商（DeepSeek / OpenRouter / Moonshot / Z.ai）、填写名称与 API Key（如 DeepSeek 的 Key 在 [platform.deepseek.com](https://platform.deepseek.com) → API Keys 页面创建），点击**测试**验证，再点**应用**。
+4. 回到桌面即可看到实时余额，悬浮窗可拖动到任意位置（位置会被记住）；配置多个账户后可在托盘「账户」菜单切换显示。
 
-余额数据来源于 DeepSeek 官方接口 `GET https://api.deepseek.com/user/balance`，仅使用你自己的 API Key 查询，不上传任何数据到第三方。
+余额数据来源于各供应商官方接口（如 DeepSeek `GET https://api.deepseek.com/user/balance`），仅使用你自己的 API Key 查询，不上传任何数据到第三方。
 
 ## 数据保存在哪里
 
-所有数据存放在 Windows 用户目录下 `AppData\Local\DeepSeekBalanceMonitor\`：
+所有数据存放在 Windows 用户目录下 `我的文档\DeepSeek余额监控\`：
 
 | 文件 | 内容 |
 |------|------|
-| `config.json` | 全部设置（API 密钥使用 Windows 系统加密存储） |
-| `history.json` | 余额历史记录 |
-| `logs\` | 运行日志（自动保留最近若干份） |
+| `设置.json` | 全部设置（含账户列表 `Accounts`，每个账户的 API 密钥使用 Windows 系统加密存储；`ActiveAccountId` 记录当前显示账户） |
+| `余额记录.json` | 余额历史记录（每条记录带 `accountId`，按账户隔离统计） |
+| `日志\` | 运行日志（自动保留最近若干份） |
 
 ## 开发者信息
 
