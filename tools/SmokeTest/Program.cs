@@ -27,12 +27,12 @@ namespace SmokeTest
             Console.WriteLine("测试密钥: " + key.Substring(0, Math.Min(8, key.Length)) + "..." + (key.Length > 8 ? key.Substring(key.Length - 4) : ""));
             Console.WriteLine("目标接口: https://api.deepseek.com/user/balance");
 
-            var api = new DeepSeekApiClient();
+            var provider = ProviderRegistry.Get("deepseek");
             try
             {
-                var result = Task.Run(async () => await api.GetBalanceAsync(key)).GetAwaiter().GetResult();
-                Console.WriteLine("[成功] 余额 = ¥" + result.TotalBalance.ToString("F2")
-                    + "，账户可用 = " + result.IsAvailable + "，查询时间 = " + result.Time.ToString("yyyy-MM-dd HH:mm:ss"));
+                var result = Task.Run(async () => await provider.GetBalanceAsync(key)).GetAwaiter().GetResult();
+                Console.WriteLine("[成功] 余额 = ¥" + (result.Remaining?.ToString("F2") ?? "-")
+                    + "，账户可用 = " + result.IsAvailable + "，币种 = " + result.Currency);
                 return 0;
             }
             catch (BalanceQueryException ex)

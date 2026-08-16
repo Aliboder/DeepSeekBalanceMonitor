@@ -22,7 +22,6 @@ namespace CoreTests
 
             Console.WriteLine("=== 核心逻辑测试开始 ===");
 
-            TestBalanceParse();
             TestHistoryStore();
             TestDeepSeekProvider();
             TestOtherProviders();
@@ -34,35 +33,6 @@ namespace CoreTests
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
             return _failed == 0 ? 0 : 1;
-        }
-
-        // ============ 余额解析 ============
-
-        private static void TestBalanceParse()
-        {
-            Console.WriteLine("-- 余额解析 --");
-
-            // 1. 标准响应（CNY）
-            var r1 = DeepSeekApiClient.ParseBalance(
-                "{\"is_available\":true,\"balance_infos\":[{\"currency\":\"CNY\",\"total_balance\":\"110.00\",\"granted_balance\":\"10.00\",\"topped_up_balance\":\"100.00\"}]}");
-            Assert(r1.TotalBalance == 110m && r1.IsAvailable, "标准 CNY 响应解析");
-
-            // 2. 多币种时取 CNY
-            var r2 = DeepSeekApiClient.ParseBalance(
-                "{\"is_available\":true,\"balance_infos\":[{\"currency\":\"USD\",\"total_balance\":\"15.50\"},{\"currency\":\"CNY\",\"total_balance\":\"88.88\"}]}");
-            Assert(r2.TotalBalance == 88.88m, "多币种取 CNY");
-
-            // 3. 无 CNY 时取首个币种
-            var r3 = DeepSeekApiClient.ParseBalance(
-                "{\"is_available\":true,\"balance_infos\":[{\"currency\":\"USD\",\"total_balance\":\"15.50\"}]}");
-            Assert(r3.TotalBalance == 15.50m, "无 CNY 取首个币种");
-
-            // 4. 空余额 → 抛异常
-            AssertThrows<FormatException>(() => DeepSeekApiClient.ParseBalance(
-                "{\"is_available\":true,\"balance_infos\":[]}"), "空余额列表抛异常");
-
-            // 5. 非法 JSON → 抛异常（JavaScriptSerializer 抛 ArgumentException，上层统一包装）
-            AssertThrowsAny(() => DeepSeekApiClient.ParseBalance("not json"), "非法 JSON 抛异常");
         }
 
         // ============ DeepSeek 适配器 ============

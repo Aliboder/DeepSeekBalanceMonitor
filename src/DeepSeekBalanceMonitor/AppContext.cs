@@ -21,7 +21,6 @@ namespace DeepSeekBalanceMonitor
         public ConfigService ConfigService { get; }
         public Config Config { get; private set; }
         public HistoryStore History { get; }
-        public DeepSeekApiClient Api { get; }
         public MonitorCoordinator Coordinator { get; private set; }
 
         /// <summary>当前账户监控实例（兼容旧 UI 引用，无账户时返回 null）。</summary>
@@ -45,7 +44,6 @@ namespace DeepSeekBalanceMonitor
             ConfigService = new ConfigService(ConfigPath);
             Config = ConfigService.Load();
             History = new HistoryStore(HistoryPath, Config.Accounts.Count > 0 ? Config.Accounts[0].Id : null);
-            Api = new DeepSeekApiClient();
 
             // —— 轮询调度 + 悬浮窗 + 托盘 ——
             Coordinator = new MonitorCoordinator();

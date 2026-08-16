@@ -8,7 +8,7 @@ using DeepSeekBalanceMonitor.Core;
 namespace DeepSeekBalanceMonitor.UI
 {
     /// <summary>
-    /// 设置窗口：全部设置改动即时生效。含 API 密钥管理（测试/应用/清空）与开机自启。
+    /// 设置窗口：全部设置改动即时生效。含多账户管理（账户列表 + 编辑区）与开机自启。
     /// 布局：所有控件使用组内相对坐标，组高度按内容自动计算，保证全部设置项完整显示。
     /// </summary>
     public class SettingsForm : Form
@@ -17,8 +17,13 @@ namespace DeepSeekBalanceMonitor.UI
         private readonly Timer _saveTimer; // 防抖保存：连续改动 800ms 后落盘
 
         // 跨方法使用的控件（其余控件均为局部变量）
-        private TextBox _keyBox;
+        private ListBox _accountList;
+        private TextBox _nameBox, _keyBox;
+        private ComboBox _providerBox;
+        private NumericUpDown _thresholdBox;
+        private Button _btnTest, _btnApply, _btnDelete, _btnAdd;
         private Label _lblKeyStatus;
+        private string _editingId; // 当前编辑账户 Id
 
         // 布局：窗体级 Y 游标
         private int _y = 12;
@@ -69,7 +74,7 @@ namespace DeepSeekBalanceMonitor.UI
 
             BuildDisplayGroup();
             BuildAlertGroup();
-            BuildKeyGroup();
+            BuildAccountsGroup();
             BuildOtherGroup();
 
             // 底部：打开数据文件夹
@@ -190,28 +195,6 @@ namespace DeepSeekBalanceMonitor.UI
             var g = AddGroup("余额提醒");
             int y = 26;
 
-            g.Controls.Add(new Label { Text = "预警阈值：", AutoSize = true, Location = new Point(14, y + 4) });
-            var numThreshold = new NumericUpDown
-            {
-                Location = new Point(110, y), Width = 110, Minimum = 0, Maximum = 99999.99m,
-                DecimalPlaces = 2, Value = Math.Min(_ctx.Config.ActiveAccount?.WarnThreshold ?? 10m, 99999.99m)
-            };
-            if (_dark)
-            {
-                numThreshold.BackColor = DarkInputBg;
-                numThreshold.ForeColor = DarkInputFg;
-            }
-            g.Controls.Add(numThreshold);
-            g.Controls.Add(new Label { Text = "元", AutoSize = true, Location = new Point(228, y + 4) });
-            numThreshold.ValueChanged += (s, e) =>
-            {
-                var act = _ctx.Config.ActiveAccount;
-                if (act != null) act.WarnThreshold = numThreshold.Value;
-                _ctx.Monitor.SetWarnThreshold(numThreshold.Value); // 悬浮窗颜色立即更新
-                MarkDirty();
-            };
-            y += 36;
-
             AddCheck(g, "余额低于阈值时弹出通知", _ctx.Config.NotifyLowBalance, ref y,
                 v => { _ctx.Config.NotifyLowBalance = v; MarkDirty(); });
             AddCheck(g, "消费突增时弹出通知", _ctx.Config.NotifySurge, ref y,
@@ -220,48 +203,110 @@ namespace DeepSeekBalanceMonitor.UI
             FinishGroup(g, y);
         }
 
-        private void BuildKeyGroup()
+        private void BuildAccountsGroup()
         {
-            var g = AddGroup("API 密钥");
+            var g = AddGroup("账户");
             int y = 26;
 
-            _keyBox = new TextBox
+            // 左列：账户列表
+            _accountList = new ListBox { Location = new Point(14, y), Size = new Size(130, 190) };
+            if (_dark)
             {
-                Location = new Point(14, y), Width = 320,
-                UseSystemPasswordChar = true,
-                Text = _ctx.Config.ActiveAccount?.ApiKey ?? ""
-            };
+                _accountList.BackColor = DarkInputBg;
+                _accountList.ForeColor = DarkInputFg;
+            }
+            _accountList.SelectedIndexChanged += OnAccountSelected;
+            g.Controls.Add(_accountList);
+
+            // 右列：编辑区（x=160 起）
+            g.Controls.Add(new Label { Text = "名称：", AutoSize = true, Location = new Point(160, y + 4) });
+            _nameBox = new TextBox { Location = new Point(230, y), Width = 190 };
+            if (_dark)
+            {
+                _nameBox.BackColor = DarkInputBg;
+                _nameBox.ForeColor = DarkInputFg;
+            }
+            _nameBox.TextChanged += (s, e) => { SaveEditingToAccount(); MarkDirty(); };
+            g.Controls.Add(_nameBox);
+            y += 36;
+
+            g.Controls.Add(new Label { Text = "供应商：", AutoSize = true, Location = new Point(160, y + 4) });
+            _providerBox = new ComboBox { Location = new Point(230, y), Width = 190, DropDownStyle = ComboBoxStyle.DropDownList };
+            if (_dark)
+            {
+                _providerBox.BackColor = DarkInputBg;
+                _providerBox.ForeColor = DarkInputFg;
+            }
+            foreach (var p in ProviderRegistry.All) _providerBox.Items.Add(new ProviderItem(p));
+            _providerBox.SelectedIndexChanged += (s, e) => { SaveEditingToAccount(); MarkDirty(); };
+            g.Controls.Add(_providerBox);
+            y += 36;
+
+            g.Controls.Add(new Label { Text = "API 密钥：", AutoSize = true, Location = new Point(160, y + 4) });
+            _keyBox = new TextBox { Location = new Point(230, y), Width = 150, UseSystemPasswordChar = true };
             if (_dark)
             {
                 _keyBox.BackColor = DarkInputBg;
                 _keyBox.ForeColor = DarkInputFg;
             }
+            _keyBox.TextChanged += (s, e) => { SaveEditingToAccount(); MarkDirty(); };
             g.Controls.Add(_keyBox);
-            var chkShowKey = new CheckBox { Text = "显示密钥", AutoSize = true, Location = new Point(340, y + 3) };
+            var chkShowKey = new CheckBox { Text = "显示", AutoSize = true, Location = new Point(384, y + 3) };
             chkShowKey.CheckedChanged += (s, e) => _keyBox.UseSystemPasswordChar = !chkShowKey.Checked;
             g.Controls.Add(chkShowKey);
             y += 36;
 
-            var btnTest = new Button { Text = "测试", Location = new Point(14, y), Width = 75, Height = 30 };
-            var btnApply = new Button { Text = "应用", Location = new Point(98, y), Width = 75, Height = 30 };
-            var btnClear = new Button { Text = "清空", Location = new Point(182, y), Width = 75, Height = 30 };
-            btnTest.Click += OnTestKey;
-            btnApply.Click += OnApplyKey;
-            btnClear.Click += OnClearKey;
-            g.Controls.Add(btnTest);
-            g.Controls.Add(btnApply);
-            g.Controls.Add(btnClear);
+            g.Controls.Add(new Label { Text = "预警阈值：", AutoSize = true, Location = new Point(160, y + 4) });
+            _thresholdBox = new NumericUpDown
+            {
+                Location = new Point(230, y), Width = 110, Minimum = 0, Maximum = 99999.99m, DecimalPlaces = 2
+            };
+            if (_dark)
+            {
+                _thresholdBox.BackColor = DarkInputBg;
+                _thresholdBox.ForeColor = DarkInputFg;
+            }
+            // 阈值写入账户对象并即时更新悬浮窗颜色
+            _thresholdBox.ValueChanged += (s, e) =>
+            {
+                var acc = EditingAccount;
+                if (acc != null)
+                {
+                    acc.WarnThreshold = _thresholdBox.Value;
+                    _ctx.Coordinator.Get(acc.Id)?.SetWarnThreshold(_thresholdBox.Value);
+                }
+                MarkDirty();
+            };
+            g.Controls.Add(_thresholdBox);
+            g.Controls.Add(new Label { Text = "元", AutoSize = true, Location = new Point(348, y + 4) });
+            y += 36;
+
+            // 按钮行
+            _btnAdd = new Button { Text = "新增账户", Location = new Point(160, y), Width = 84, Height = 30 };
+            _btnDelete = new Button { Text = "删除", Location = new Point(252, y), Width = 54, Height = 30 };
+            _btnTest = new Button { Text = "测试", Location = new Point(314, y), Width = 54, Height = 30 };
+            _btnApply = new Button { Text = "应用", Location = new Point(376, y), Width = 54, Height = 30 };
+            _btnAdd.Click += OnAddAccount;
+            _btnDelete.Click += OnDeleteAccount;
+            _btnTest.Click += OnTestKey;
+            _btnApply.Click += OnApplyKey;
+            g.Controls.Add(_btnAdd);
+            g.Controls.Add(_btnDelete);
+            g.Controls.Add(_btnTest);
+            g.Controls.Add(_btnApply);
             y += 38;
 
             _lblKeyStatus = new Label
             {
-                AutoSize = false, Location = new Point(14, y), Width = 420, Height = 32,
+                AutoSize = false, Location = new Point(160, y), Width = 270, Height = 32,
                 ForeColor = Color.Gray
             };
             g.Controls.Add(_lblKeyStatus);
             y += 38;
 
             FinishGroup(g, y);
+
+            RefreshAccountList();
         }
 
         private void BuildOtherGroup()
@@ -331,21 +376,145 @@ namespace DeepSeekBalanceMonitor.UI
             _saveTimer.Start();
         }
 
-        // ============ 密钥管理 ============
+        // ============ 账户管理 ============
+
+        /// <summary>当前编辑区对应的账户（未选择时返回 null）。</summary>
+        private AccountConfig EditingAccount => _ctx.Config.Accounts.Find(a => a.Id == _editingId);
+
+        /// <summary>当前列表选中的账户。</summary>
+        private AccountConfig SelectedAccount =>
+            _accountList.SelectedIndex >= 0 && _accountList.SelectedIndex < _ctx.Config.Accounts.Count
+                ? _ctx.Config.Accounts[_accountList.SelectedIndex]
+                : null;
+
+        /// <summary>把编辑区四个字段写回当前编辑账户对象（切换/应用/测试前调用）。</summary>
+        private void SaveEditingToAccount()
+        {
+            var acc = EditingAccount;
+            if (acc == null) return;
+            acc.Name = _nameBox.Text.Trim();
+            if (_providerBox.SelectedItem is ProviderItem pi) acc.ProviderId = pi.Id;
+            acc.ApiKey = _keyBox.Text.Trim();
+            acc.WarnThreshold = _thresholdBox.Value;
+        }
+
+        /// <summary>把账户列表按当前 Accounts 重建，并选中 _editingId 对应账户（默认首个）。</summary>
+        private void RefreshAccountList()
+        {
+            _accountList.Items.Clear();
+            foreach (var a in _ctx.Config.Accounts) _accountList.Items.Add(a.Name);
+            int idx = _ctx.Config.Accounts.FindIndex(a => a.Id == _editingId);
+            if (idx < 0 && _ctx.Config.Accounts.Count > 0) idx = 0;
+            _accountList.SelectedIndex = idx;
+        }
+
+        /// <summary>把选中账户加载到编辑区。</summary>
+        private void LoadAccountToEdit()
+        {
+            var acc = SelectedAccount;
+            if (acc == null)
+            {
+                _editingId = null;
+                _nameBox.Text = "";
+                _keyBox.Text = "";
+                _thresholdBox.Value = 10m;
+                _providerBox.SelectedIndex = -1;
+                SetKeyStatus("未选择账户", true);
+                return;
+            }
+            _editingId = acc.Id;
+            _nameBox.Text = acc.Name;
+            _keyBox.Text = acc.ApiKey;
+            _thresholdBox.Value = Math.Min(Math.Max(acc.WarnThreshold, _thresholdBox.Minimum), _thresholdBox.Maximum);
+            _providerBox.SelectedIndex = FindProviderIndex(acc.ProviderId);
+            SetKeyStatus("", false);
+        }
+
+        private int FindProviderIndex(string providerId)
+        {
+            for (int i = 0; i < _providerBox.Items.Count; i++)
+            {
+                if ((_providerBox.Items[i] as ProviderItem)?.Id == providerId) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>切换列表选中：先保存当前编辑到账户对象，再加载新选中账户。</summary>
+        private void OnAccountSelected(object sender, EventArgs e)
+        {
+            SaveEditingToAccount();
+            LoadAccountToEdit();
+        }
+
+        private void OnAddAccount(object sender, EventArgs e)
+        {
+            SaveEditingToAccount();
+            var acc = new AccountConfig { Name = "新账户", ProviderId = "deepseek" };
+            _ctx.Config.Accounts.Add(acc);
+            ApplyAccounts();
+            _editingId = acc.Id;
+            RefreshAccountList();
+            LoadAccountToEdit();
+        }
+
+        private void OnDeleteAccount(object sender, EventArgs e)
+        {
+            var acc = SelectedAccount;
+            if (acc == null)
+            {
+                MessageBox.Show(this, "请先选择要删除的账户", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (MessageBox.Show(this, "确定删除账户「" + acc.Name + "」吗？",
+                    "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            SaveEditingToAccount();
+            _ctx.Config.Accounts.Remove(acc);
+            if (_ctx.Config.ActiveAccountId == acc.Id)
+                _ctx.Config.ActiveAccountId = _ctx.Config.Accounts.Count > 0 ? _ctx.Config.Accounts[0].Id : "";
+            _editingId = null;
+            ApplyAccounts();
+            RefreshAccountList();
+            LoadAccountToEdit();
+        }
+
+        /// <summary>把账户列表推给协调器重建监控，并保存配置。</summary>
+        private void ApplyAccounts()
+        {
+            _ctx.Coordinator.SetAccounts(_ctx.Config.Accounts, _ctx.History,
+                pid => ProviderRegistry.Get(pid));
+            _ctx.Coordinator.ActiveAccountId = _ctx.Config.ActiveAccountId;
+            _ctx.Coordinator.SetInterval(_ctx.Config.RefreshIntervalSeconds);
+            _ctx.SaveConfig();
+        }
 
         private async void OnTestKey(object sender, EventArgs e)
         {
+            SaveEditingToAccount();
+            var acc = SelectedAccount;
+            if (acc == null)
+            {
+                SetKeyStatus("请先选择账户", true);
+                return;
+            }
             var key = _keyBox.Text.Trim();
             if (string.IsNullOrEmpty(key))
             {
                 SetKeyStatus("请先输入密钥", true);
                 return;
             }
+            var provider = ProviderRegistry.Get(acc.ProviderId);
+            if (provider == null)
+            {
+                SetKeyStatus("未知供应商：" + acc.ProviderId, true);
+                return;
+            }
             SetKeyStatus("正在测试密钥...", false);
             try
             {
-                var result = await _ctx.Api.GetBalanceAsync(key);
-                SetKeyStatus("✅ 密钥有效，当前余额 ¥" + result.TotalBalance.ToString("F2"), false);
+                var result = await provider.GetBalanceAsync(key);
+                SetKeyStatus("✅ 密钥有效，当前余额 ¥" + (result.Remaining?.ToString("F2") ?? "-"), false);
             }
             catch (BalanceQueryException ex)
             {
@@ -355,44 +524,32 @@ namespace DeepSeekBalanceMonitor.UI
 
         private void OnApplyKey(object sender, EventArgs e)
         {
-            var key = _keyBox.Text.Trim();
-            if (string.IsNullOrEmpty(key))
+            SaveEditingToAccount();
+            var acc = SelectedAccount;
+            if (acc == null)
             {
-                OnClearKey(sender, e);
+                SetKeyStatus("请先选择账户", true);
                 return;
             }
-            string tail = key.Length >= 4 ? key.Substring(key.Length - 4) : key;
-            if (MessageBox.Show(this,
-                    "确认应用此 API 密钥（末 4 位：" + tail + "）？\n应用后将立即刷新余额。",
-                    "确认密钥", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                return;
-
-            var act = _ctx.Config.ActiveAccount;
-            if (act != null) act.ApiKey = key;
-            _ctx.SaveConfig();
-            _ctx.Monitor.SetApiKey(key); // 立即用新密钥查询，不等下一个刷新周期
+            ApplyAccounts();
+            _ctx.Coordinator.Get(acc.Id)?.RefreshNow(); // 立即查询，不等下一个刷新周期
             SetKeyStatus("已应用，正在刷新余额...", false);
-        }
-
-        private void OnClearKey(object sender, EventArgs e)
-        {
-            if (MessageBox.Show(this,
-                    "确定清空 API 密钥吗？\n清空后将停止查询余额。",
-                    "确认清空", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                return;
-
-            var act = _ctx.Config.ActiveAccount;
-            if (act != null) act.ApiKey = "";
-            _ctx.SaveConfig();
-            _ctx.Monitor.SetApiKey("");
-            _keyBox.Text = "";
-            SetKeyStatus("密钥已清空，余额查询已停止", false);
+            RefreshAccountList(); // 账户改名后刷新列表显示
         }
 
         private void SetKeyStatus(string text, bool error)
         {
             _lblKeyStatus.Text = text;
             _lblKeyStatus.ForeColor = error ? Color.FromArgb(0xC0, 0x39, 0x2B) : Color.FromArgb(0x1E, 0x84, 0x41);
+        }
+
+        /// <summary>供应商下拉项：显示 DisplayName，携带 Id。</summary>
+        private class ProviderItem
+        {
+            public string Id { get; }
+            public string Name { get; }
+            public ProviderItem(IBalanceProvider p) { Id = p.Id; Name = p.DisplayName; }
+            public override string ToString() => Name;
         }
     }
 }
