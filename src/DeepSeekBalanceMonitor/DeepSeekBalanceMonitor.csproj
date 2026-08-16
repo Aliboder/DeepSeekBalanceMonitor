@@ -7,7 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>DeepSeekBalanceMonitor</AssemblyName>
     <RootNamespace>DeepSeekBalanceMonitor</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>DeepSeekBalanceMonitor</Authors>
     <Description>DeepSeek 余额监控 - 实时查看 DeepSeek API 账户余额的桌面小工具</Description>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

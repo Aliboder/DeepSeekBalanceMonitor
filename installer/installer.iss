@@ -1,6 +1,6 @@
 ; DeepSeek 余额监控 安装包脚本（Inno Setup 6）
 #define MyAppName "DeepSeek 余额监控"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.0.0"
 #define MyAppExeName "DeepSeekBalanceMonitor.exe"
 
 [Setup]
