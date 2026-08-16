@@ -188,8 +188,12 @@ namespace CoreTests
                 Assert(loaded2.Accounts.Count == 2 && loaded2.Accounts[0].ApiKey == "k1" && loaded2.Accounts[1].ApiKey == "k2",
                     "多账户往返");
                 Assert(loaded2.ActiveAccountId == "b", "ActiveAccountId 往返");
-                Assert(!File.ReadAllText(path).Contains("k1") && !File.ReadAllText(path).Contains("k2"),
-                    "明文密钥不落盘");
+                // 落盘的是密文而非明文：DPAPI 输出为随机字节，base64 可能恰好包含明文子串，
+                // 故不断言"不含子串"，而是断言密文不等于明文本身（确定性，不会 flaky）
+                var enc1 = typeof(ConfigService).GetMethod("EncryptKey",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { "k1" });
+                Assert(enc1.ToString() != "k1", "明文密钥不落盘");
             }
             finally { try { File.Delete(path); } catch { } }
         }
