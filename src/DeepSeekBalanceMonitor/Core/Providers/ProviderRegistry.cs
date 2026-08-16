@@ -13,6 +13,9 @@ namespace DeepSeekBalanceMonitor.Core
         static ProviderRegistry()
         {
             Register(new DeepSeekProvider());
+            Register(new OpenRouterProvider());
+            Register(new MoonshotProvider());
+            Register(new ZaiProvider());
         }
 
         /// <summary>登记一个适配器（重复 Id 覆盖）。</summary>

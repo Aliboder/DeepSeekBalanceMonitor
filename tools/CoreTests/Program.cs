@@ -23,6 +23,7 @@ namespace CoreTests
             TestBalanceParse();
             TestHistoryStore();
             TestDeepSeekProvider();
+            TestOtherProviders();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -83,6 +84,33 @@ namespace CoreTests
 
             Assert(ProviderRegistry.Get("deepseek") != null, "注册表包含 deepseek");
             Assert(ProviderRegistry.All.Count >= 1, "注册表 All 非空");
+        }
+
+        // ============ OpenRouter / Moonshot / Z.ai 适配器 ============
+
+        private static void TestOtherProviders()
+        {
+            Console.WriteLine("-- OpenRouter / Moonshot / Z.ai 适配器 --");
+
+            // OpenRouter：credits 接口（Management Key）
+            var o = OpenRouterProvider.ParseCredits(
+                "{\"data\":{\"total_credits\":100.0,\"total_usage\":23.5}}");
+            Assert(o.Remaining == 76.5m && o.Used == 23.5m && o.Total == 100.0m && o.Currency == "USD", "OpenRouter 剩余=总额-已用");
+
+            // Moonshot：available / voucher / cash
+            var m = MoonshotProvider.ParseBalance(
+                "{\"data\":{\"available_balance\":42.5,\"voucher_balance\":10.0,\"cash_balance\":32.5,\"currency\":\"CNY\"}}");
+            Assert(m.Remaining == 42.5m && m.Granted == 10.0m && m.ToppedUp == 32.5m, "Moonshot 余额分解");
+
+            // Z.ai：total / available
+            var z = ZaiProvider.ParseBalance(
+                "{\"data\":{\"total_balance\":200.0,\"available_balance\":188.5,\"currency\":\"CNY\"}}");
+            Assert(z.Remaining == 188.5m && z.Total == 200.0m, "Z.ai 可用余额解析");
+
+            // 注册表
+            Assert(ProviderRegistry.Get("openrouter") != null, "注册表包含 openrouter");
+            Assert(ProviderRegistry.Get("moonshot") != null, "注册表包含 moonshot");
+            Assert(ProviderRegistry.Get("zai") != null, "注册表包含 zai");
         }
 
         // ============ 历史存储与消费统计 ============
