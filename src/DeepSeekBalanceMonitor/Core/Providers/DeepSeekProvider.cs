@@ -7,32 +7,22 @@ using System.Web.Script.Serialization;
 
 namespace DeepSeekBalanceMonitor.Core
 {
-    /// <summary>余额查询结果。</summary>
-    public class BalanceResult
-    {
-        /// <summary>账户是否还可调用 API。</summary>
-        public bool IsAvailable { get; set; }
-
-        /// <summary>余额（元）。</summary>
-        public decimal TotalBalance { get; set; }
-
-        /// <summary>查询时间。</summary>
-        public DateTime Time { get; set; } = DateTime.Now;
-    }
-
     /// <summary>
-    /// DeepSeek 官方余额接口客户端。
+    /// DeepSeek 官方余额适配器。
     /// GET https://api.deepseek.com/user/balance
     /// Authorization: Bearer &lt;API Key&gt;
     /// </summary>
-    public class DeepSeekApiClient
+    public class DeepSeekProvider : IBalanceProvider
     {
+        public string Id => "deepseek";
+        public string DisplayName => "DeepSeek";
+        public string BaseUrl => "https://api.deepseek.com";
+
         private const string Endpoint = "https://api.deepseek.com/user/balance";
         private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
 
-        /// <summary>查询当前余额。失败时抛出 <see cref="BalanceQueryException"/>。</summary>
-        public async Task<BalanceResult> GetBalanceAsync(string apiKey)
+        public async Task<AccountBalance> GetBalanceAsync(string apiKey)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 throw new BalanceQueryException(QueryErrorKind.AuthFailed, "尚未设置 API 密钥，请先到「设置」中填写");
@@ -43,10 +33,7 @@ namespace DeepSeekBalanceMonitor.Core
                 req.Headers.TryAddWithoutValidation("Accept", "application/json");
 
                 HttpResponseMessage resp;
-                try
-                {
-                    resp = await Http.SendAsync(req).ConfigureAwait(false);
-                }
+                try { resp = await Http.SendAsync(req).ConfigureAwait(false); }
                 catch (Exception ex)
                 {
                     throw new BalanceQueryException(QueryErrorKind.Network, "网络请求失败: " + ex.Message);
@@ -55,25 +42,14 @@ namespace DeepSeekBalanceMonitor.Core
                 using (resp)
                 {
                     var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                    // 认证类错误：HTTP 401/403，或平台返回的业务错误码 40002/40003
                     if (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden
                         || body.Contains("40002") || body.Contains("40003"))
-                    {
                         throw new BalanceQueryException(QueryErrorKind.AuthFailed,
                             "API 密钥无效或已失效（HTTP " + (int)resp.StatusCode + "）");
-                    }
-
                     if (!resp.IsSuccessStatusCode)
-                    {
                         throw new BalanceQueryException(QueryErrorKind.Network,
                             "接口返回异常状态码 HTTP " + (int)resp.StatusCode);
-                    }
-
-                    try
-                    {
-                        return ParseBalance(body);
-                    }
+                    try { return ParseBalance(body); }
                     catch (Exception ex)
                     {
                         throw new BalanceQueryException(QueryErrorKind.ParseError,
@@ -84,7 +60,7 @@ namespace DeepSeekBalanceMonitor.Core
         }
 
         /// <summary>解析官方响应，取人民币（CNY）余额。公开供测试。</summary>
-        public static BalanceResult ParseBalance(string body)
+        public static AccountBalance ParseBalance(string body)
         {
             var doc = Json.Deserialize<BalanceDoc>(body);
             if (doc == null || doc.balance_infos == null || doc.balance_infos.Length == 0)
@@ -93,24 +69,29 @@ namespace DeepSeekBalanceMonitor.Core
             BalanceInfo cny = null;
             foreach (var info in doc.balance_infos)
             {
-                if (string.Equals(info.currency, "CNY", StringComparison.OrdinalIgnoreCase))
-                {
-                    cny = info;
-                    break;
-                }
+                if (string.Equals(info.currency, "CNY", StringComparison.OrdinalIgnoreCase)) { cny = info; break; }
             }
             var picked = cny ?? doc.balance_infos[0];
             if (picked == null || string.IsNullOrEmpty(picked.total_balance))
                 throw new FormatException("余额字段为空");
 
-            return new BalanceResult
+            return new AccountBalance
             {
                 IsAvailable = doc.is_available,
-                TotalBalance = decimal.Parse(picked.total_balance, CultureInfo.InvariantCulture)
+                Remaining = ParseNullable(picked.total_balance),
+                Granted = ParseNullable(picked.granted_balance),
+                ToppedUp = ParseNullable(picked.topped_up_balance),
+                Currency = picked.currency ?? "CNY"
             };
         }
 
-        // —— 官方响应结构（按需字段） ——
+        /// <summary>字符串余额 → decimal?；空串返回 null。</summary>
+        private static decimal? ParseNullable(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return null;
+            return decimal.Parse(value, CultureInfo.InvariantCulture);
+        }
+
         private class BalanceDoc
         {
             public bool is_available { get; set; }
@@ -121,6 +102,8 @@ namespace DeepSeekBalanceMonitor.Core
         {
             public string currency { get; set; }
             public string total_balance { get; set; }
+            public string granted_balance { get; set; }
+            public string topped_up_balance { get; set; }
         }
     }
 }

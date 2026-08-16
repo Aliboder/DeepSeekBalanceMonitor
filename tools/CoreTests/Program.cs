@@ -22,6 +22,7 @@ namespace CoreTests
 
             TestBalanceParse();
             TestHistoryStore();
+            TestDeepSeekProvider();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -55,6 +56,33 @@ namespace CoreTests
 
             // 5. 非法 JSON → 抛异常（JavaScriptSerializer 抛 ArgumentException，上层统一包装）
             AssertThrowsAny(() => DeepSeekApiClient.ParseBalance("not json"), "非法 JSON 抛异常");
+        }
+
+        // ============ DeepSeek 适配器 ============
+
+        private static void TestDeepSeekProvider()
+        {
+            Console.WriteLine("-- DeepSeek 适配器 --");
+
+            var r1 = DeepSeekProvider.ParseBalance(
+                "{\"is_available\":true,\"balance_infos\":[{\"currency\":\"CNY\",\"total_balance\":\"110.00\",\"granted_balance\":\"10.00\",\"topped_up_balance\":\"100.00\"}]}");
+            Assert(r1.Remaining == 110m && r1.IsAvailable, "标准 CNY 响应解析");
+            Assert(r1.Granted == 10m && r1.ToppedUp == 100m && r1.Currency == "CNY", "赠送/充值/币种解析");
+
+            var r2 = DeepSeekProvider.ParseBalance(
+                "{\"is_available\":true,\"balance_infos\":[{\"currency\":\"USD\",\"total_balance\":\"15.50\"},{\"currency\":\"CNY\",\"total_balance\":\"88.88\"}]}");
+            Assert(r2.Remaining == 88.88m, "多币种取 CNY");
+
+            var r3 = DeepSeekProvider.ParseBalance(
+                "{\"is_available\":true,\"balance_infos\":[{\"currency\":\"USD\",\"total_balance\":\"15.50\"}]}");
+            Assert(r3.Remaining == 15.50m && r3.Currency == "USD", "无 CNY 取首个币种");
+
+            AssertThrows<FormatException>(() => DeepSeekProvider.ParseBalance(
+                "{\"is_available\":true,\"balance_infos\":[]}"), "空余额列表抛异常");
+            AssertThrowsAny(() => DeepSeekProvider.ParseBalance("not json"), "非法 JSON 抛异常");
+
+            Assert(ProviderRegistry.Get("deepseek") != null, "注册表包含 deepseek");
+            Assert(ProviderRegistry.All.Count >= 1, "注册表 All 非空");
         }
 
         // ============ 历史存储与消费统计 ============
