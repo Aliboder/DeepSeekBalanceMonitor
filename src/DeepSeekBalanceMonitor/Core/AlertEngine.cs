@@ -18,6 +18,8 @@ namespace DeepSeekBalanceMonitor.Core
 
         private readonly Dictionary<string, bool> _wasLow = new Dictionary<string, bool>();
         private readonly Dictionary<string, DateTime> _lastSurgeDay = new Dictionary<string, DateTime>();
+        // 某账户是否已被观察过（首次观察不提醒，避免启动轰炸）
+        private readonly Dictionary<string, bool> _initialized = new Dictionary<string, bool>();
 
         public AlertEngine(Config config, HistoryStore history, Action<string, string, ToolTipIcon> notify)
         {
@@ -33,10 +35,13 @@ namespace DeepSeekBalanceMonitor.Core
             var aid = monitor.AccountId;
             var threshold = monitor.WarnThreshold;
 
+            bool initialized = _initialized.TryGetValue(aid, out var init) && init;
+            _initialized[aid] = true; // mark seen
+
             if (monitor.Status == BalanceStatus.Low)
             {
                 bool wasLow = _wasLow.TryGetValue(aid, out var w) && w;
-                if (_config.NotifyLowBalance && !wasLow && monitor.Balance.HasValue)
+                if (_config.NotifyLowBalance && initialized && !wasLow && monitor.Balance.HasValue)
                 {
                     _notify("⚠ 余额不足",
                         monitor.AccountName + " 余额仅剩 ¥" + monitor.Balance.Value.ToString("F2")
