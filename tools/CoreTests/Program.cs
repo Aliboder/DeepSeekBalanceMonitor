@@ -118,49 +118,54 @@ namespace CoreTests
 
         private static void TestHistoryStore()
         {
-            Console.WriteLine("-- 历史存储与消费统计 --");
+            Console.WriteLine("-- 历史存储（按账户） --");
             var path = Path.Combine(Path.GetTempPath(), "CoreTests-" + Guid.NewGuid().ToString("N") + ".json");
             try
             {
+                // 旧记录归属测试：先写无账户标记的文件，构造时归入 "acc1"
+                var legacyPath = Path.Combine(Path.GetTempPath(), "CoreTests-" + Guid.NewGuid().ToString("N") + ".json");
+                File.WriteAllText(legacyPath, "{\"records\":[{\"time\":\"2026-08-01 10:00:00\",\"balance\":100}]}");
+                var storeL = new HistoryStore(legacyPath, "acc1");
+                Assert(storeL.Records.Count == 1 && storeL.Records[0].AccountId == "acc1", "旧记录归属迁移账户");
+                try { File.Delete(legacyPath); } catch { }
+
                 var store = new HistoryStore(path);
                 var day0 = DateTime.Today.AddDays(-6).AddHours(10);
 
-                // 1. 相同余额去重：只刷新时间戳不新增
-                store.Append(100m, day0);
-                store.Append(100m, day0.AddHours(1));
-                Assert(store.Records.Count == 1, "相同余额去重");
-                Assert(store.Records[0].Time == day0.AddHours(1), "去重时刷新时间戳");
+                // 账户 A：100 → 95 → 90（三天），今天 85
+                store.Append("accA", 100m, day0);
+                store.Append("accA", 95m, day0.AddDays(1));
+                store.Append("accA", 90m, day0.AddDays(2));
+                store.Append("accA", 85m, DateTime.Today.AddHours(9));
+                // 账户 B：50 → 49（今天）
+                store.Append("accB", 50m, day0);
+                store.Append("accB", 49m, DateTime.Today.AddHours(8));
 
-                // 2. 余额下降记录追加
-                store.Append(95m, day0.AddDays(1));
-                store.Append(90m, day0.AddDays(2));
-                Assert(store.Records.Count == 3, "余额变化追加记录");
+                Assert(store.Records.Count == 6, "两个账户共 6 条");
+                Assert(store.GetRecords("accA").Count == 4 && store.GetRecords("accB").Count == 2, "按账户过滤");
 
-                // 3. 今日消费：昨天 90 → 今天 85 = 5
-                var todayRec = DateTime.Today.AddHours(9);
-                store.Append(85m, todayRec);
-                Assert(store.TodaySpent() == 5m, "今日消费计算");
+                // 同账户相同余额去重：只刷新时间戳
+                store.Append("accA", 85m, DateTime.Today.AddHours(10));
+                Assert(store.GetRecords("accA").Count == 4, "同账户相同余额去重");
 
-                // 4. 近 7 天日均（不含今天）：100→95→90 = 10 消费 / 3 个有记录的天 = 3.33
-                Assert(store.AverageDailySpent(7) == 10m / 3m, "近7天日均（不含今天）");
+                // 消费统计按账户
+                Assert(store.TodaySpent("accA") == 5m, "账户A 今日消费 5");
+                Assert(store.TodaySpent("accB") == 1m, "账户B 今日消费 1");
+                Assert(store.TotalSpent("accA") == 15m, "账户A 总消费 15");
+                Assert(store.TotalSpent("accB") == 1m, "账户B 总消费 1");
+                Assert(store.AverageDailySpent("accA", 7) == 10m / 3m, "账户A 近7天日均（不含今天）");
 
-                // 5. 总消费：10 + 5 = 15
-                Assert(store.TotalSpent() == 15m, "总消费计算");
-
-                // 6. 持久化：新实例重新加载
+                // 持久化重载
                 var store2 = new HistoryStore(path);
-                Assert(store2.Records.Count == 4, "历史持久化重载");
-                Assert(store2.TotalSpent() == 15m, "重载后统计一致");
+                Assert(store2.GetRecords("accA").Count == 4 && store2.GetRecords("accB").Count == 2, "重载后按账户一致");
+                Assert(store2.TodaySpent("accA") == 5m, "重载后账户A 今日消费一致");
 
-                // 7. 文件损坏时安全回退
+                // 损坏回退
                 File.WriteAllText(path, "{broken json");
                 var store3 = new HistoryStore(path);
                 Assert(store3.Records.Count == 0, "损坏文件安全回退");
             }
-            finally
-            {
-                try { File.Delete(path); } catch { }
-            }
+            finally { try { File.Delete(path); } catch { } }
         }
 
         // ============ 配置迁移 ============

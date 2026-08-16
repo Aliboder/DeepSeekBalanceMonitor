@@ -41,7 +41,9 @@ namespace DeepSeekBalanceMonitor
 
             ConfigService = new ConfigService(ConfigPath);
             Config = ConfigService.Load();
-            History = new HistoryStore(HistoryPath);
+            var migrateAccountId = (Config.Accounts.Count > 0 && string.IsNullOrEmpty(Config.Accounts[0].ProviderId) == false)
+                ? Config.Accounts[0].Id : null;
+            History = new HistoryStore(HistoryPath, Config.Accounts.Count > 0 ? Config.Accounts[0].Id : null);
             Api = new DeepSeekApiClient();
 
             // —— 轮询调度 + 悬浮窗 + 托盘 ——

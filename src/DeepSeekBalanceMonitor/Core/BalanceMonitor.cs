@@ -24,6 +24,7 @@ namespace DeepSeekBalanceMonitor.Core
         private readonly object _lock = new object();
 
         private string _apiKey;
+        private string _accountId = "";
         private decimal _warnThreshold;
         private bool _busy;
         private bool _disposed;
@@ -128,7 +129,7 @@ namespace DeepSeekBalanceMonitor.Core
                 LastSuccessTime = result.Time;
                 ErrorMessage = null;
                 ConsecutiveFailures = 0;
-                _history.Append(result.TotalBalance, result.Time);
+                _history.Append(_accountId, result.TotalBalance, result.Time);
                 ReevaluateStatus();
 
                 Logger.Current?.Info("余额查询成功: ¥" + result.TotalBalance.ToString("F2"));

@@ -62,8 +62,9 @@ namespace DeepSeekBalanceMonitor.Core
             if (!_ctx.Config.NotifySurge) return;
             if (_lastSurgeDay == DateTime.Today) return;
 
-            var today = _ctx.History.TodaySpent();
-            var avg = _ctx.History.AverageDailySpent(7);
+            var aid = _ctx.Config.ActiveAccount?.Id ?? "";
+            var today = _ctx.History.TodaySpent(aid);
+            var avg = _ctx.History.AverageDailySpent(aid, 7);
 
             // 无历史基线（如刚安装）或今天无消费时不判断
             if (avg <= 0m || today <= 0m) return;

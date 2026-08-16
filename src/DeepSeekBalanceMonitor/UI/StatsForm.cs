@@ -196,7 +196,8 @@ namespace DeepSeekBalanceMonitor.UI
         public void RefreshData()
         {
             var history = _ctx.History;
-            var records = history.Records;
+            var aid = _ctx.Config.ActiveAccount?.Id ?? "";
+            var records = history.GetRecords(aid);
             var monitor = _ctx.Monitor;
             var cfg = _ctx.Config;
 
@@ -209,8 +210,8 @@ namespace DeepSeekBalanceMonitor.UI
 
             // —— 统计摘要（当前余额 / 今日消费 / 日均消费） ——
             decimal? balance = monitor.Balance;
-            decimal today = history.TodaySpent();
-            decimal total = history.TotalSpent();
+            decimal today = history.TodaySpent(aid);
+            decimal total = history.TotalSpent(aid);
 
             // 整体日均：从首条记录到今天的天数
             decimal avgAll = 0;
