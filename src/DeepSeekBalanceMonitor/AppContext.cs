@@ -70,8 +70,8 @@ namespace DeepSeekBalanceMonitor
             FloatWindow.HideRequested += (s, minutes) => HideService.Hide(minutes);
 
             // 智能告警（余额不足 / 消费突增）
-            Alerts = new AlertEngine(this);
-            Coordinator.StateChanged += (s, e) => Alerts.OnBalanceChanged();
+            Alerts = new AlertEngine(Config, History, (t, m, i) => Notify.Show(t, m, i));
+            Coordinator.StateChanged += (s, e) => Alerts.OnBalanceChanged(Coordinator.Current);
 
             // 统计面板：悬浮窗双击 / 托盘左键 / 托盘菜单「统计」统一入口
             Stats = new StatsForm(this);

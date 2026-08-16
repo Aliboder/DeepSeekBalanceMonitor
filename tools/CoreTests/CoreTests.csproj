@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ToolTipIcon（AlertEngine 通知委托签名）所在程序集 -->
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\DeepSeekBalanceMonitor\DeepSeekBalanceMonitor.csproj" />
   </ItemGroup>
 

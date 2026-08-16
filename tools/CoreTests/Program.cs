@@ -28,6 +28,7 @@ namespace CoreTests
             TestConfigMigration();
             TestBalanceMonitor();
             TestCoordinator();
+            TestAlertEngine();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -316,6 +317,58 @@ namespace CoreTests
 
                 // SetInterval 广播
                 coord.SetInterval(60); // 不抛异常即通过（内部广播到各账户）
+            }
+            finally { try { File.Delete(path); } catch { } }
+        }
+
+        // ============ AlertEngine（按账户） ============
+
+        private static void TestAlertEngine()
+        {
+            Console.WriteLine("-- AlertEngine（按账户） --");
+            var path = Path.Combine(Path.GetTempPath(), "CoreTests-" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                var history = new HistoryStore(path);
+                var cfg = new Config();
+                cfg.NotifyLowBalance = true;
+                int lowNotify = 0, surgeNotify = 0;
+                var alert = new AlertEngine(cfg, history,
+                    (title, msg, icon) => { if (title.Contains("余额不足")) lowNotify++; if (title.Contains("消费突增")) surgeNotify++; });
+
+                var accA = new AccountConfig { Id = "a", Name = "A", ProviderId = "fake", ApiKey = "ka", WarnThreshold = 30m };
+                var accB = new AccountConfig { Id = "b", Name = "B", ProviderId = "fake", ApiKey = "kb", WarnThreshold = 30m };
+                var fpA = new FakeProvider { Value = 50m };
+                var fpB = new FakeProvider { Value = 50m };
+                var monA = new BalanceMonitor(fpA, history, accA);
+                var monB = new BalanceMonitor(fpB, history, accB);
+
+                // 初始化（首次不提醒）
+                alert.OnBalanceChanged(monA);
+                Assert(lowNotify == 0, "首次状态不提醒");
+
+                // 账户A 跌到阈值以下 → 提醒一次
+                fpA.Value = 10m;
+                monA.RefreshNowAsync().Wait();
+                alert.OnBalanceChanged(monA);
+                Assert(lowNotify == 1, "A 低余额提醒");
+                alert.OnBalanceChanged(monA);
+                Assert(lowNotify == 1, "A 连续低余额不重复提醒");
+
+                // 账户B 也跌到阈值以下 → 独立提醒（按账户隔离）
+                fpB.Value = 10m;
+                monB.RefreshNowAsync().Wait();
+                alert.OnBalanceChanged(monB);
+                Assert(lowNotify == 2, "B 低余额独立提醒");
+
+                // A 恢复后再次跌破 → 再提醒
+                fpA.Value = 50m;
+                monA.RefreshNowAsync().Wait();
+                alert.OnBalanceChanged(monA);
+                fpA.Value = 5m;
+                monA.RefreshNowAsync().Wait();
+                alert.OnBalanceChanged(monA);
+                Assert(lowNotify == 3, "A 恢复后再跌破重新提醒");
             }
             finally { try { File.Delete(path); } catch { } }
         }
