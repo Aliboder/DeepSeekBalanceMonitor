@@ -195,21 +195,26 @@ namespace DeepSeekBalanceMonitor.UI
         /// <summary>重新计算并刷新全部统计内容（打开面板/余额更新时调用）。</summary>
         public void RefreshData()
         {
-            var history = _ctx.History;
             var monitor = _ctx.Coordinator?.Current;
-            var aid = monitor?.AccountId ?? "";
+            // 无当前账户（未配置/全部被删）时显示空态标题，不渲染数据
+            if (monitor == null) { Text = "统计 - DeepSeek 余额监控"; return; }
+            var aid = monitor.AccountId;
+            var history = _ctx.History;
             var records = history.GetRecords(aid);
-            var cfg = _ctx.Config;
+            var threshold = monitor.WarnThreshold;
 
-            // 防抖：数据未变化（余额、最后记录、阈值均相同）时不重建界面，
+            // 标题显示当前账户
+            Text = "统计 - " + monitor.AccountName + "（" + monitor.ProviderDisplayName + "）";
+
+            // 防抖：数据未变化（余额、最后记录、阈值、账户均相同）时不重建界面，
             // 避免每 30 秒轮询时表格反复全量重建（闪烁/开销）
             string fp = (records.Count > 0 ? records[records.Count - 1].Time.Ticks + "|" + records[records.Count - 1].Balance : "e")
-                + "|" + monitor?.Balance + "|" + (cfg.ActiveAccount?.WarnThreshold ?? 10m);
+                + "|" + monitor.Balance + "|" + threshold + "|" + aid;
             if (fp == _dataFingerprint) return;
             _dataFingerprint = fp;
 
             // —— 统计摘要（当前余额 / 今日消费 / 日均消费） ——
-            decimal? balance = monitor?.Balance;
+            decimal? balance = monitor.Balance;
             decimal today = history.TodaySpent(aid);
             decimal total = history.TotalSpent(aid);
 
