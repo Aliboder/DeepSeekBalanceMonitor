@@ -85,7 +85,15 @@ namespace DeepSeekBalanceMonitor.UI
         /// <summary>状态变化后调用：更新余额文字、颜色、详情。</summary>
         public void UpdateDisplay()
         {
-            var m = _ctx.Monitor;
+            var m = _ctx.Coordinator?.Current;
+            if (m == null)
+            {
+                _balanceText = "未配置账户";
+                _balanceTextColor = Color.FromArgb(0x9C, 0x9C, 0x9C); // 灰：未配置
+                UpdateSize();
+                Refresh();
+                return;
+            }
 
             switch (m.Status)
             {

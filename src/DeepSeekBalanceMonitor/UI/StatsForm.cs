@@ -196,20 +196,20 @@ namespace DeepSeekBalanceMonitor.UI
         public void RefreshData()
         {
             var history = _ctx.History;
-            var aid = _ctx.Config.ActiveAccount?.Id ?? "";
+            var monitor = _ctx.Coordinator?.Current;
+            var aid = monitor?.AccountId ?? "";
             var records = history.GetRecords(aid);
-            var monitor = _ctx.Monitor;
             var cfg = _ctx.Config;
 
             // 防抖：数据未变化（余额、最后记录、阈值均相同）时不重建界面，
             // 避免每 30 秒轮询时表格反复全量重建（闪烁/开销）
             string fp = (records.Count > 0 ? records[records.Count - 1].Time.Ticks + "|" + records[records.Count - 1].Balance : "e")
-                + "|" + monitor.Balance + "|" + (cfg.ActiveAccount?.WarnThreshold ?? 10m);
+                + "|" + monitor?.Balance + "|" + (cfg.ActiveAccount?.WarnThreshold ?? 10m);
             if (fp == _dataFingerprint) return;
             _dataFingerprint = fp;
 
             // —— 统计摘要（当前余额 / 今日消费 / 日均消费） ——
-            decimal? balance = monitor.Balance;
+            decimal? balance = monitor?.Balance;
             decimal today = history.TodaySpent(aid);
             decimal total = history.TotalSpent(aid);
 

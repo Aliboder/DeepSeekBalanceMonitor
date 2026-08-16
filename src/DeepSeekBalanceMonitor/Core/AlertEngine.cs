@@ -24,7 +24,8 @@ namespace DeepSeekBalanceMonitor.Core
         /// <summary>余额监控每次状态变化时调用（成功查询 / 失败 / 阈值修改）。</summary>
         public void OnBalanceChanged()
         {
-            var m = _ctx.Monitor;
+            var m = _ctx.Coordinator?.Current;
+            if (m == null) return;
 
             // —— 余额不足临界点提醒 ——
             if (m.Status == BalanceStatus.Low)

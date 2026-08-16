@@ -27,6 +27,7 @@ namespace CoreTests
             TestOtherProviders();
             TestConfigMigration();
             TestBalanceMonitor();
+            TestCoordinator();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -272,6 +273,49 @@ namespace CoreTests
                 var mon2 = new BalanceMonitor(bad, new HistoryStore(path), new AccountConfig { Id = "acc2", ApiKey = "k2" });
                 mon2.RefreshNowAsync().Wait();
                 Assert(mon2.Status == BalanceStatus.Error && mon2.ConsecutiveFailures == 1, "查询失败为 Error");
+            }
+            finally { try { File.Delete(path); } catch { } }
+        }
+
+        // ============ MonitorCoordinator ============
+
+        private static void TestCoordinator()
+        {
+            Console.WriteLine("-- MonitorCoordinator --");
+            var path = Path.Combine(Path.GetTempPath(), "CoreTests-" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                var fpA = new FakeProvider { Value = 100m };
+                var fpB = new FakeProvider { Value = 5m };
+                var coord = new MonitorCoordinator();
+                coord.SetAccounts(new[]
+                {
+                    new AccountConfig { Id = "a", Name = "A", ProviderId = "fakeA", ApiKey = "ka", WarnThreshold = 10m },
+                    new AccountConfig { Id = "b", Name = "B", ProviderId = "fakeB", ApiKey = "kb", WarnThreshold = 10m }
+                }, new HistoryStore(path), id => id == "fakeA" ? fpA : (IBalanceProvider)fpB);
+
+                coord.ActiveAccountId = "a";
+                coord.RefreshNow();
+                System.Threading.Thread.Sleep(300);
+
+                var ma = coord.Get("a");
+                Assert(ma != null && ma.Balance == 100m && ma.Status == BalanceStatus.Normal, "账户A 查询成功");
+                var mb = coord.Get("b");
+                Assert(mb != null && mb.Balance == 5m && mb.Status == BalanceStatus.Low, "账户B 低余额为 Low");
+
+                Assert(coord.Current != null && coord.Current.AccountId == "a", "Current 指向当前账户");
+                coord.ActiveAccountId = "b";
+                Assert(coord.Current.AccountId == "b", "切换后 Current 更新");
+
+                // 事件聚合：某账户状态变化触发协调器事件
+                int fired = 0;
+                coord.StateChanged += (s, e) => fired++;
+                fpA.Value = 1m;
+                coord.Get("a").RefreshNowAsync().Wait();
+                Assert(fired >= 1, "协调器聚合账户状态事件");
+
+                // SetInterval 广播
+                coord.SetInterval(60); // 不抛异常即通过（内部广播到各账户）
             }
             finally { try { File.Delete(path); } catch { } }
         }

@@ -122,7 +122,16 @@ namespace DeepSeekBalanceMonitor.UI
         /// <summary>余额监控状态变化后调用：更新图标颜色、悬停气泡、菜单文字。</summary>
         public void UpdateFromMonitor()
         {
-            var m = _ctx.Monitor;
+            var m = _ctx.Coordinator?.Current;
+            if (m == null)
+            {
+                // 未配置账户：默认图标 + 暂无数据，不崩
+                SetIcon(_iconDefault);
+                _icon.Text = "DeepSeek 余额监控\n未配置账户";
+                _miBalance.Text = "当前余额：暂无数据";
+                _miError.Text = "";
+                return;
+            }
 
             switch (m.Status)
             {
@@ -186,9 +195,9 @@ namespace DeepSeekBalanceMonitor.UI
         internal void RefreshMenu()
         {
             var cfg = _ctx.Config;
-            var m = _ctx.Monitor;
+            var m = _ctx.Coordinator?.Current;
 
-            _miBalance.Text = m.Balance.HasValue
+            _miBalance.Text = m != null && m.Balance.HasValue
                 ? "当前余额：¥" + m.Balance.Value.ToString("F2")
                 : "当前余额：暂无数据";
 
@@ -196,7 +205,7 @@ namespace DeepSeekBalanceMonitor.UI
             _miShow.Visible = _ctx.HideService.IsHidden;
 
             // 错误信息项：有错误时显示，无错误时隐藏
-            _miError.Visible = m.Status == BalanceStatus.Error && !string.IsNullOrEmpty(m.ErrorMessage);
+            _miError.Visible = m != null && m.Status == BalanceStatus.Error && !string.IsNullOrEmpty(m.ErrorMessage);
             if (_miError.Visible)
             {
                 _miError.Text = (m.ErrorMessage ?? "查询出错")

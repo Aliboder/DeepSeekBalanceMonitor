@@ -22,7 +22,10 @@ namespace DeepSeekBalanceMonitor
         public Config Config { get; private set; }
         public HistoryStore History { get; }
         public DeepSeekApiClient Api { get; }
-        public BalanceMonitor Monitor { get; private set; }
+        public MonitorCoordinator Coordinator { get; private set; }
+
+        /// <summary>当前账户监控实例（兼容旧 UI 引用，无账户时返回 null）。</summary>
+        public BalanceMonitor Monitor => Coordinator?.Current;
         public FloatingWindow FloatWindow { get; private set; }
         public TrayIcon Tray { get; private set; }
         public HideService HideService { get; private set; }
@@ -45,11 +48,12 @@ namespace DeepSeekBalanceMonitor
             Api = new DeepSeekApiClient();
 
             // —— 轮询调度 + 悬浮窗 + 托盘 ——
-            var act = Config.ActiveAccount;
-            var provider = act == null ? null : ProviderRegistry.Get(act.ProviderId);
-            Monitor = new BalanceMonitor(provider ?? new DeepSeekProvider(), History, act ?? new AccountConfig { ProviderId = "deepseek" });
+            Coordinator = new MonitorCoordinator();
+            Coordinator.SetAccounts(Config.Accounts, History,
+                pid => ProviderRegistry.Get(pid));
+            Coordinator.ActiveAccountId = Config.ActiveAccountId;
             FloatWindow = new FloatingWindow(this);
-            Monitor.StateChanged += (s, e) =>
+            Coordinator.StateChanged += (s, e) =>
             {
                 FloatWindow.UpdateDisplay();
                 Tray.UpdateFromMonitor();
@@ -67,11 +71,11 @@ namespace DeepSeekBalanceMonitor
 
             // 智能告警（余额不足 / 消费突增）
             Alerts = new AlertEngine(this);
-            Monitor.StateChanged += (s, e) => Alerts.OnBalanceChanged();
+            Coordinator.StateChanged += (s, e) => Alerts.OnBalanceChanged();
 
             // 统计面板：悬浮窗双击 / 托盘左键 / 托盘菜单「统计」统一入口
             Stats = new StatsForm(this);
-            Monitor.StateChanged += (s, e) => { if (Stats != null && Stats.Visible) Stats.RefreshData(); };
+            Coordinator.StateChanged += (s, e) => { if (Stats != null && Stats.Visible) Stats.RefreshData(); };
             FloatWindow.OpenStatsRequested += (s, e) => ShowStats();
             Tray.ShowStatsRequested += (s, e) => ShowStats();
 
@@ -83,7 +87,9 @@ namespace DeepSeekBalanceMonitor
             // 开机自启状态同步（防止安装位置变化后自启失效）
             AutoStartService.Sync(Config);
 
-            Monitor.Start(Config.RefreshIntervalSeconds);
+            // Coordinator.Start 内置 30 秒间隔，随后广播配置的真实间隔
+            Coordinator.Start();
+            Coordinator.SetInterval(Config.RefreshIntervalSeconds);
 
             Log.Info("程序启动");
         }
@@ -133,7 +139,7 @@ namespace DeepSeekBalanceMonitor
         public void ExitApp()
         {
             Log.Info("程序退出");
-            Monitor?.Stop();
+            Coordinator?.Stop();
             HideService?.Dispose();
             Tray?.Dispose();
             ExitThread();
