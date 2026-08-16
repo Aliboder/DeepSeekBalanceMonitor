@@ -18,6 +18,8 @@ namespace DeepSeekBalanceMonitor.UI
         private string _balanceText = "⚠ 查询中";
         private Color _balanceTextColor = Color.FromArgb(0x4A, 0xDE, 0x80);
         private Font _balanceFont;
+        private string _accountNameText = "";
+        private Font _nameFont;
 
         // 拖动状态
         private bool _dragging;
@@ -59,6 +61,8 @@ namespace DeepSeekBalanceMonitor.UI
 
             if (_balanceFont != null) _balanceFont.Dispose();
             _balanceFont = new Font("Microsoft YaHei UI", cfg.FontSize, FontStyle.Bold);
+            if (_nameFont != null) _nameFont.Dispose();
+            _nameFont = new Font("Microsoft YaHei UI", 9f);
 
             UpdateSize();
 
@@ -90,6 +94,7 @@ namespace DeepSeekBalanceMonitor.UI
             {
                 _balanceText = "未配置账户";
                 _balanceTextColor = Color.FromArgb(0x9C, 0x9C, 0x9C); // 灰：未配置
+                _accountNameText = "";
                 UpdateSize();
                 Refresh();
                 return;
@@ -113,6 +118,8 @@ namespace DeepSeekBalanceMonitor.UI
                     break;
             }
 
+            _accountNameText = m.AccountName;
+
             UpdateSize();
             Refresh();
         }
@@ -125,9 +132,17 @@ namespace DeepSeekBalanceMonitor.UI
         {
             if (_balanceFont == null) return;
 
-            var m = TextRenderer.MeasureText(_balanceText, _balanceFont);
-            int w = Math.Max(m.Width + 8, 46);
-            int h = m.Height + 6; // 上下各 3px
+            var balanceSize = TextRenderer.MeasureText(_balanceText, _balanceFont);
+            int w = Math.Max(balanceSize.Width + 8, 46);
+            int h = balanceSize.Height + 6; // 上下各 3px
+
+            // 有账户名时：宽取两行最大值，高 = 账户名行(18) + 余额行 + 6
+            if (!string.IsNullOrEmpty(_accountNameText) && _nameFont != null)
+            {
+                var nameSize = TextRenderer.MeasureText(_accountNameText, _nameFont);
+                w = Math.Max(w, nameSize.Width + 8);
+                h = 18 + balanceSize.Height + 6;
+            }
 
             if (ClientSize.Width != w || ClientSize.Height != h)
             {
@@ -186,7 +201,20 @@ namespace DeepSeekBalanceMonitor.UI
 
             // 余额文字：状态色（深色背景上直接清晰，无需阴影）
             var flags = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
-            TextRenderer.DrawText(e.Graphics, _balanceText, _balanceFont, ClientRectangle, _balanceTextColor, flags);
+
+            // 账户名：小号灰色，显示在余额上方
+            if (!string.IsNullOrEmpty(_accountNameText) && _nameFont != null)
+            {
+                var nameRect = new Rectangle(0, 2, Width, 18);
+                TextRenderer.DrawText(e.Graphics, _accountNameText, _nameFont, nameRect,
+                    Color.FromArgb(0x9C, 0x9C, 0x9C), flags);
+            }
+
+            // 有账户名时余额下移一行，否则整窗居中（保持原有布局）
+            var balanceRect = string.IsNullOrEmpty(_accountNameText)
+                ? ClientRectangle
+                : new Rectangle(0, 18, Width, Height - 18);
+            TextRenderer.DrawText(e.Graphics, _balanceText, _balanceFont, balanceRect, _balanceTextColor, flags);
         }
 
         private static GraphicsPath RoundedRect(Rectangle bounds, int radius)

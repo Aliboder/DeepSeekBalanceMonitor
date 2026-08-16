@@ -133,6 +133,14 @@ namespace DeepSeekBalanceMonitor
             ConfigService.Save(Config);
         }
 
+        /// <summary>切换当前显示的账户（托盘「账户」子菜单调用）。</summary>
+        public void SwitchAccount(string accountId)
+        {
+            Config.ActiveAccountId = accountId;
+            SaveConfig();
+            Coordinator.ActiveAccountId = accountId; // 触发 StateChanged → 悬浮窗/托盘/统计刷新
+        }
+
         /// <summary>退出程序（托盘右键菜单的唯一退出入口）。</summary>
         public void ExitApp()
         {

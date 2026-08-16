@@ -23,6 +23,7 @@ namespace DeepSeekBalanceMonitor.UI
         private readonly ToolStripMenuItem _miError;
         private readonly ToolStripMenuItem _miLock;
         private readonly ToolStripMenuItem _miTopmost;
+        private readonly ToolStripMenuItem _miAccounts;
 
         // 动态生成的状态图标（4 色）
         private Icon _iconNormal, _iconLow, _iconError, _iconDefault;
@@ -80,6 +81,8 @@ namespace DeepSeekBalanceMonitor.UI
             _miTopmost = new ToolStripMenuItem("置顶");
             _miTopmost.Click += (s, e) => ToggleTopMost();
 
+            _miAccounts = new ToolStripMenuItem("账户");
+
             var miStats = new ToolStripMenuItem("统计");
             miStats.Click += (s, e) => ShowStatsRequested?.Invoke(this, EventArgs.Empty);
 
@@ -95,6 +98,7 @@ namespace DeepSeekBalanceMonitor.UI
             _menu.Items.Add(_miLock);
             _menu.Items.Add(_miTopmost);
             _menu.Items.Add(new ToolStripSeparator());
+            _menu.Items.Add(_miAccounts);
             _menu.Items.Add(miStats);
             _menu.Items.Add(miExit);
 
@@ -216,6 +220,20 @@ namespace DeepSeekBalanceMonitor.UI
             _miLock.Text = cfg.LockMode ? "解锁（取消点击穿透）" : "锁定（点击穿透）";
             _miLock.Checked = cfg.LockMode;
             _miTopmost.Checked = cfg.TopMost;
+
+            // 「账户」子菜单：按配置账户重建，勾选当前显示账户；无/仅 1 个账户时隐藏
+            _miAccounts.DropDownItems.Clear();
+            foreach (var acc in _ctx.Config.Accounts)
+            {
+                var name = acc.Name;
+                if (string.IsNullOrEmpty(name))
+                    name = _ctx.Coordinator.Get(acc.Id)?.ProviderDisplayName ?? acc.ProviderId;
+                var item = new ToolStripMenuItem(name) { Checked = acc.Id == _ctx.Config.ActiveAccountId };
+                string aid = acc.Id;
+                item.Click += (s, e) => _ctx.SwitchAccount(aid);
+                _miAccounts.DropDownItems.Add(item);
+            }
+            _miAccounts.Visible = _ctx.Config.Accounts.Count > 1;
         }
 
         // ============ 图标绘制 ============
