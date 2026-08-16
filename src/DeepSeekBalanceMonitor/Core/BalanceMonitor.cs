@@ -56,6 +56,9 @@ namespace DeepSeekBalanceMonitor.Core
         /// <summary>当前供应商显示名。</summary>
         public string ProviderDisplayName => _provider.DisplayName;
 
+        /// <summary>当前账户预警阈值。</summary>
+        public decimal WarnThreshold => _account.WarnThreshold;
+
         public BalanceMonitor(IBalanceProvider provider, HistoryStore history, AccountConfig account)
         {
             _provider = provider;
