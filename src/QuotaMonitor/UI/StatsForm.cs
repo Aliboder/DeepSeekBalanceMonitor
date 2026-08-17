@@ -48,6 +48,12 @@ namespace QuotaMonitor.UI
         private Color _bgColor, _fgColor, _panelColor, _gridLineColor, _mutedColor, _downColor, _upColor;
         private static readonly Color AccentBlue = Color.FromArgb(0x00, 0x67, 0xC0);
 
+        // 状态徽章（自绘进父卡片 Paint，无子控件）
+        private string _balanceBadgeText = "";
+        private Color _balanceBadgeColor = Color.Transparent;
+        private string _subBadgeText = "";
+        private Color _subBadgeColor = Color.Transparent;
+
         /// <summary>数据指纹：余额/最后记录/阈值/套餐状态均未变化时跳过界面重建（防抖）。</summary>
         private string _dataFingerprint = "";
 
@@ -151,15 +157,17 @@ namespace QuotaMonitor.UI
                 BackColor = _bgColor,
                 Padding = new Padding(8, 6, 8, 6)
             };
-            _balanceCard.Paint += (s, e) => PaintCard(e.Graphics, _balanceCard.ClientRectangle, _gridLineColor);
+            _balanceCard.Paint += (s, e) =>
+            {
+                PaintCard(e.Graphics, _balanceCard.ClientRectangle, _gridLineColor);
+                DrawBadge(e.Graphics, _balanceCard, _balanceBadgeText, _balanceBadgeColor);
+            };
             _balanceMark = MakeMarkLabel("DS", Color.FromArgb(0x1F, 0x6F, 0xEB));
             _balanceCard.Controls.Add(_balanceMark);
             _balanceName = MakeLabel("DeepSeek", 10f, FontStyle.Bold, _fgColor, new Point(44, 4), new Size(240, 20));
             _balanceCard.Controls.Add(_balanceName);
             _balanceSub = MakeLabel("API 余额", 8.5f, FontStyle.Regular, _mutedColor, new Point(44, 24), new Size(240, 16));
             _balanceCard.Controls.Add(_balanceSub);
-            _balanceBadge = MakeBadgeLabel(new Point(0, 10), new Size(70, 22));
-            _balanceCard.Controls.Add(_balanceBadge);
             _balanceAmount = MakeLabel("--", 19f, FontStyle.Bold, _fgColor, new Point(10, 44), new Size(0, 32));
             _balanceAmount.Width = _balanceCard.ClientSize.Width - 20;
             _balanceAmount.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
@@ -178,15 +186,17 @@ namespace QuotaMonitor.UI
                 BackColor = _bgColor,
                 Padding = new Padding(8, 6, 8, 6)
             };
-            _subCard.Paint += (s, e) => PaintCard(e.Graphics, _subCard.ClientRectangle, _gridLineColor);
+            _subCard.Paint += (s, e) =>
+            {
+                PaintCard(e.Graphics, _subCard.ClientRectangle, _gridLineColor);
+                DrawBadge(e.Graphics, _subCard, _subBadgeText, _subBadgeColor);
+            };
             _subMark = MakeMarkLabel("GO", Color.FromArgb(0x00, 0xA6, 0x7D));
             _subCard.Controls.Add(_subMark);
             _subName = MakeLabel("Go 套餐", 10f, FontStyle.Bold, _fgColor, new Point(44, 4), new Size(240, 20));
             _subCard.Controls.Add(_subName);
             _subSub = MakeLabel("OpenCode Go", 8.5f, FontStyle.Regular, _mutedColor, new Point(44, 24), new Size(240, 16));
             _subCard.Controls.Add(_subSub);
-            _subBadge = MakeBadgeLabel(new Point(0, 10), new Size(70, 22));
-            _subCard.Controls.Add(_subBadge);
             int cardW = _subCard.ClientSize.Width; // 卡片客户区宽度（96 设计基准，Scale 后物理一致）
             // 无数据提示（仅套餐无数据时显示，此时三行窗口隐藏，互不冲突）；居中于卡片中部
             _subEmpty = MakeLabel("", 8.5f, FontStyle.Regular, _mutedColor, new Point(10, 92), new Size(cardW - 20, 20));
@@ -244,26 +254,25 @@ namespace QuotaMonitor.UI
             _chartPanel.Resize += (s, e) => LayoutBars();
             _layout.Controls.Add(_chartPanel, 0, 1);
 
-            // 徽章位置（右对齐，随卡片宽度变化）
-            _balanceBadge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _balanceBadge.Left = _balanceCard.ClientSize.Width - _balanceBadge.Width - 12;
-            _subBadge.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _subBadge.Left = _subCard.ClientSize.Width - _subBadge.Width - 12;
-            _balanceCard.Resize += (s, e) => _balanceBadge.Left = _balanceCard.ClientSize.Width - _balanceBadge.Width - 12;
-            _subCard.Resize += (s, e) => _subBadge.Left = _subCard.ClientSize.Width - _subBadge.Width - 12;
-
             RefreshData();
             Shown += (s, e) => RefreshData();
 
             // 跟随系统深浅色切换（运行时自动同步）
             SystemTheme.Changed += (s, e) => ApplyTheme();
 
-            // 调试模式（设置 → 其他 → 界面调试模式 开启，重启生效）：控件定位用
+            // 调试模式（设置 → 其他 → 界面调试模式）：控件定位用
             if (_ctx.Config.DebugMode)
             {
-                DebugProbe.Attach(_layout, _dark);
+                DebugProbe.Attach(_layout, _dark, _tip);
                 DebugProbe.Dump(_layout, "stats_controls.txt");
             }
+        }
+
+        /// <summary>供设置页调用：运行时开启调试模式时，给已有实例补挂探针。</summary>
+        public void AttachDebugProbe()
+        {
+            if (_layout == null) return;
+            DebugProbe.Attach(_layout, _dark, _tip);
         }
 
         // ============ 控件工厂 ============
@@ -392,32 +401,23 @@ namespace QuotaMonitor.UI
             return lbl;
         }
 
-        private static Label MakeBadgeLabel(Point location, Size size)
+        /// <summary>状态徽章：直接画在卡片 Paint 上（无子控件，彻底避免 Label 矩形底色问题）。右上角实色圆角胶囊 + 白字。</summary>
+        private void DrawBadge(Graphics g, Control card, string text, Color color)
         {
-            var lbl = new Label
+            if (string.IsNullOrEmpty(text) || color.A == 0) return;
+            float sc = _scale;
+            var rect = new Rectangle(
+                card.ClientSize.Width - (int)(70 * sc) - (int)(12 * sc),
+                (int)(10 * sc),
+                (int)(70 * sc) - 1,
+                (int)(22 * sc) - 1);
+            using (var path = RoundedRect(rect, rect.Height / 2))
+            using (var b = new SolidBrush(color))
             {
-                Location = location,
-                Size = size,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Microsoft YaHei UI", 7.5f),
-                BackColor = Color.Transparent
-            };
-            lbl.Tag = 7.5f;
-            // 圆角胶囊背景（自绘：背景 + 文字，物理基准一致）
-            lbl.Paint += (s, e) =>
-            {
-                var g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                var rect = lbl.ClientRectangle;
-                using (var path = RoundedRect(new Rectangle(0, 0, rect.Width - 1, rect.Height - 1), rect.Height / 2))
-                using (var b = new SolidBrush(lbl.BackColor))
-                {
-                    g.FillPath(b, path);
-                }
-                TextRenderer.DrawText(g, lbl.Text, lbl.Font, rect, lbl.ForeColor,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
-            };
-            return lbl;
+                g.FillPath(b, path);
+            }
+            TextRenderer.DrawText(g, text, _balanceName.Font, rect, Color.White,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
         }
 
         /// <summary>直边进度条（原生外观；填充色随使用率从品牌绿平滑渐变到红）。</summary>
@@ -674,7 +674,7 @@ namespace QuotaMonitor.UI
             else if ((error ?? "").Contains("限流")) { text = "限流"; color = Color.FromArgb(0xE8, 0x93, 0x0C); }
             else if ((error ?? "").Contains("密钥")) { text = "密钥无效"; color = _mutedColor; }
             else { text = "出错"; color = Color.FromArgb(0xFF, 0xA9, 0x4D); }
-            SetBadge(_balanceBadge, text, color);
+            SetBalanceBadge(text, color);
         }
 
         private void ApplySubBadge(bool configured, SubscriptionResult result, string error)
@@ -686,15 +686,21 @@ namespace QuotaMonitor.UI
             else if ((error ?? "").Contains("限流")) { text = "限流"; color = Color.FromArgb(0xE8, 0x93, 0x0C); }
             else if ((error ?? "").Contains("密钥")) { text = "密钥无效"; color = _mutedColor; }
             else { text = "出错"; color = Color.FromArgb(0xFF, 0xA9, 0x4D); }
-            SetBadge(_subBadge, text, color);
+            SetSubBadge(text, color);
         }
 
-        private void SetBadge(Label badge, string text, Color color)
+        private void SetBalanceBadge(string text, Color color)
         {
-            badge.Text = text;
-            badge.ForeColor = color;
-            badge.BackColor = Color.FromArgb(_dark ? 45 : 25, color);
-            badge.Invalidate();
+            _balanceBadgeText = text;
+            _balanceBadgeColor = color;
+            _balanceCard.Invalidate();
+        }
+
+        private void SetSubBadge(string text, Color color)
+        {
+            _subBadgeText = text;
+            _subBadgeColor = color;
+            _subCard.Invalidate();
         }
 
         protected override void OnHandleCreated(EventArgs e)
