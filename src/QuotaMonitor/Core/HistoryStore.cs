@@ -96,6 +96,28 @@ namespace QuotaMonitor.Core
         }
 
         /// <summary>
+        /// 近 days 天每日消费（含今天），元。返回数组 [0]=最远一天 ... [days-1]=今天；
+        /// 无记录或有余额上升的日期为 0。消费归入余额变化发生的那一天（与 TodaySpent 口径一致）。
+        /// </summary>
+        public decimal[] DailySpent(int days)
+        {
+            lock (_lock)
+            {
+                var result = new decimal[days];
+                var today = DateTime.Today;
+                for (int i = 1; i < _records.Count; i++)
+                {
+                    var t = _records[i].Time;
+                    int idx = (today - t.Date).Days;
+                    if (idx < 0 || idx >= days) continue;
+                    var d = _records[i - 1].Balance - _records[i].Balance;
+                    if (d > 0) result[days - 1 - idx] += d;
+                }
+                return result;
+            }
+        }
+
+        /// <summary>
         /// 近 days 天日均消费（不含今天），元。
         /// 按实际有记录的日期数平均，历史不足 days 天时按实际天数算。
         /// </summary>

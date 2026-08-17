@@ -126,12 +126,24 @@ namespace QuotaMonitor.Core
 
                 Balance = result.TotalBalance;
                 LastSuccessTime = result.Time;
-                ErrorMessage = null;
-                ConsecutiveFailures = 0;
                 _history.Append(result.TotalBalance, result.Time);
-                ReevaluateStatus();
 
-                Logger.Current?.Info("余额查询成功: ¥" + result.TotalBalance.ToString("F2"));
+                if (!result.IsAvailable)
+                {
+                    // 账户被平台停用（欠费等）：余额可能仍返回数字，但标记为异常并提示原因
+                    ErrorMessage = "账户不可用（欠费或被平台停用）";
+                    Status = BalanceStatus.Error;
+                    Logger.Current?.Warn("余额查询成功但账户不可用: ¥" + result.TotalBalance.ToString("F2"));
+                    OnStateChanged();
+                }
+                else
+                {
+                    ErrorMessage = null;
+                    ConsecutiveFailures = 0;
+                    ReevaluateStatus();
+
+                    Logger.Current?.Info("余额查询成功: ¥" + result.TotalBalance.ToString("F2"));
+                }
 
                 // 成功后恢复为配置的轮询间隔
                 _timer.Interval = GetEffectiveIntervalMs(_configuredInterval);

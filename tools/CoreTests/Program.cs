@@ -22,6 +22,7 @@ namespace CoreTests
 
             TestBalanceParse();
             TestHistoryStore();
+            TestOpenCodeGoParse();
 
             Console.WriteLine();
             Console.WriteLine($"=== 结果：通过 {_passed}，失败 {_failed} ===");
@@ -104,6 +105,57 @@ namespace CoreTests
             {
                 try { File.Delete(path); } catch { }
             }
+        }
+
+        // ============ OpenCode Go 套餐解析 ============
+
+        private static void TestOpenCodeGoParse()
+        {
+            Console.WriteLine("-- OpenCode Go 套餐解析 --");
+
+            // 1. 标准响应：percent 为 0~100 语义，直接使用
+            var r1 = OpenCodeGoClient.ParseUsage(
+                "{\"usage\":{\"rolling\":{\"percent\":42.0,\"resetsAt\":\"2026-08-17T10:00:00Z\"}," +
+                "\"weekly\":{\"percent\":60.5},\"monthly\":{\"percent\":30}}}");
+            Assert(r1.Windows.Count == 3, "标准响应解析 3 窗口");
+            var s1 = r1.Windows.Find(w => w.Kind == "session");
+            Assert(s1.UsedPercent == 42 && s1.RemainingPercent == 58, "percent 直接使用（0~100）");
+            Assert(s1.ResetsAt.HasValue, "resetsAt ISO 字符串解析");
+            Assert(Math.Abs(s1.ResetsAt.Value.ToUniversalTime().Subtract(new DateTime(2026, 8, 17, 10, 0, 0, DateTimeKind.Utc)).TotalMinutes) < 1, "resetsAt 值正确");
+
+            // 2. 0~1 比例归一化：dashboard 风格 usagePercent 字段
+            var r2 = OpenCodeGoClient.ParseUsage(
+                "{\"usage\":{\"rolling\":{\"usagePercent\":0.42},\"weekly\":{\"usagePercent\":0.6},\"monthly\":{\"usagePercent\":0.3}}}");
+            var s2 = r2.Windows.Find(w => w.Kind == "session");
+            Assert(s2.UsedPercent == 42, "0~1 比例自动放大为百分数（usagePercent）");
+
+            // 3. 其它别名字段（usedPercent / percentUsed / percentage）
+            var r3 = OpenCodeGoClient.ParseUsage(
+                "{\"usage\":{\"rolling\":{\"usedPercent\":0.25},\"weekly\":{\"percentUsed\":0.5},\"monthly\":{\"percentage\":0.75}}}");
+            Assert(r3.Windows.Find(w => w.Kind == "session").UsedPercent == 25, "usedPercent 别名 + 比例归一化");
+            Assert(r3.Windows.Find(w => w.Kind == "weekly").UsedPercent == 50, "percentUsed 别名 + 比例归一化");
+            Assert(r3.Windows.Find(w => w.Kind == "monthly").UsedPercent == 75, "percentage 别名 + 比例归一化");
+
+            // 4. 重置时间多种格式：resetInSec（秒）
+            var r4 = OpenCodeGoClient.ParseUsage(
+                "{\"usage\":{\"rolling\":{\"percent\":10,\"resetInSec\":3600},\"weekly\":{\"percent\":20},\"monthly\":{\"percent\":30}}}");
+            var s4 = r4.Windows.Find(w => w.Kind == "session");
+            Assert(s4.ResetsAt.HasValue && Math.Abs(s4.ResetsAt.Value.Subtract(DateTime.Now.AddSeconds(3600)).TotalSeconds) < 60, "resetInSec 秒数解析");
+
+            // 5. 重置时间：resetAt 秒级时间戳
+            var ts = new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+            var r5 = OpenCodeGoClient.ParseUsage(
+                "{\"usage\":{\"rolling\":{\"percent\":10,\"resetAt\":" + ts + "},\"weekly\":{\"percent\":20},\"monthly\":{\"percent\":30}}}");
+            var s5 = r5.Windows.Find(w => w.Kind == "session");
+            Assert(s5.ResetsAt.HasValue && s5.ResetsAt.Value.ToUniversalTime().Date == new DateTime(2026, 8, 20), "resetAt 秒级时间戳解析");
+
+            // 6. 无任何百分比字段 → 该窗口被跳过
+            var r6 = OpenCodeGoClient.ParseUsage(
+                "{\"usage\":{\"rolling\":{\"status\":\"ok\"},\"weekly\":{\"percent\":20},\"monthly\":{\"percent\":30}}}");
+            Assert(r6.Windows.Count == 2 && r6.Windows.Find(w => w.Kind == "session") == null, "缺失百分比字段的窗口跳过");
+
+            // 7. 非法 JSON → 抛异常
+            AssertThrowsAny(() => OpenCodeGoClient.ParseUsage("not json"), "Go 非法 JSON 抛异常");
         }
 
         // ============ 微型断言 ============

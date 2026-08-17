@@ -25,9 +25,9 @@ namespace QuotaMonitor.Core
             {
                 switch (Kind)
                 {
-                    case "session": return "5h 滚动";
-                    case "weekly": return "每周";
-                    case "monthly": return "每月";
+                    case "session": return "滚动用量";
+                    case "weekly": return "每周用量";
+                    case "monthly": return "每月用量";
                     default: return Kind;
                 }
             }

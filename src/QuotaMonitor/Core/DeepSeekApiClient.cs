@@ -30,7 +30,9 @@ namespace QuotaMonitor.Core
         /// <summary>接口返回了无法解析的内容（可能接口变更）。</summary>
         ParseError,
         /// <summary>账户不可用（欠费停用等）。</summary>
-        AccountUnavailable
+        AccountUnavailable,
+        /// <summary>请求过于频繁（HTTP 429 限流）。</summary>
+        RateLimited
     }
 
     /// <summary>
@@ -75,6 +77,12 @@ namespace QuotaMonitor.Core
                     {
                         throw new BalanceQueryException(QueryErrorKind.AuthFailed,
                             "API 密钥无效或已失效（HTTP " + (int)resp.StatusCode + "）");
+                    }
+
+                    if (!resp.IsSuccessStatusCode && (int)resp.StatusCode == 429)
+                    {
+                        throw new BalanceQueryException(QueryErrorKind.RateLimited,
+                            "请求过于频繁（限流），请稍后重试");
                     }
 
                     if (!resp.IsSuccessStatusCode)
