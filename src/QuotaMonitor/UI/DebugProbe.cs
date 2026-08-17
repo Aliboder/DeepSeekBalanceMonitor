@@ -16,16 +16,19 @@ namespace QuotaMonitor.UI
     public static class DebugProbe
     {
 
-        private static readonly ToolTip Tip = new ToolTip
+        /// <summary>默认 ToolTip（供无自身 ToolTip 的窗口使用）。</summary>
+        private static readonly ToolTip DefaultTip = new ToolTip
         {
             InitialDelay = 0,
             ReshowDelay = 0,
             ShowAlways = true
         };
 
-        /// <summary>递归为控件树挂唯一标识 + Tooltip（类型+序号+坐标+文本）+ 悬停高亮/还原。</summary>
-        public static void Attach(Control root, bool dark)
+        /// <summary>递归为控件树挂唯一标识 + Tooltip（类型+序号+坐标+文本）+ 悬停高亮/还原。
+        /// tip 参数传入目标窗口已有的 ToolTip 实例，避免同窗双 ToolTip 冲突。</summary>
+        public static void Attach(Control root, bool dark, ToolTip tip = null)
         {
+            var t = tip ?? DefaultTip;
             int seq = 0;
             void Walk(Control node)
             {
@@ -36,7 +39,7 @@ namespace QuotaMonitor.UI
                     string hint = (c is Label lb && !string.IsNullOrEmpty(lb.Text))
                         ? " text='" + (lb.Text.Length > 12 ? lb.Text.Substring(0, 12) + ".." : lb.Text) + "'"
                         : "";
-                    Tip.SetToolTip(c, id + " (" + c.Location.X + "," + c.Location.Y + " "
+                    t.SetToolTip(c, id + " (" + c.Location.X + "," + c.Location.Y + " "
                         + c.Width + "x" + c.Height + ")" + hint);
 
                     var orig = c.BackColor;

@@ -117,7 +117,7 @@ namespace QuotaMonitor.UI
             };
             Controls.Add(btnOpenData);
 
-            // 调试模式（设置 → 其他 → 界面调试模式 开启，重启生效）：控件定位用
+            // 调试模式（设置 → 其他 → 界面调试模式）：控件定位用
             if (_ctx.Config.DebugMode)
             {
                 DebugProbe.Attach(this, _dark);
@@ -443,10 +443,16 @@ namespace QuotaMonitor.UI
                 MarkDirty();
             });
 
-            AddCheckRow(p, "界面调试模式（控件定位，重启生效）", _ctx.Config.DebugMode, ref y, v =>
+            AddCheckRow(p, "界面调试模式（控件定位）", _ctx.Config.DebugMode, ref y, v =>
             {
                 _ctx.Config.DebugMode = v;
                 MarkDirty();
+                if (v)
+                {
+                    DebugProbe.Attach(this, _dark);
+                    if (_ctx.Stats != null && !_ctx.Stats.IsDisposed)
+                        _ctx.Stats.AttachDebugProbe();
+                }
             });
         }
 
