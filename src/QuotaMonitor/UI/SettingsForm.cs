@@ -356,6 +356,7 @@ namespace QuotaMonitor.UI
             {
                 _ctx.Config.RefreshIntervalSeconds = Config.RefreshIntervals[idx];
                 _ctx.Monitor.SetInterval(_ctx.Config.RefreshIntervalSeconds);
+                _ctx.SubMonitor.SetInterval(_ctx.Config.RefreshIntervalSeconds);
                 MarkDirty();
             };
             p.Controls.Add(cmb);

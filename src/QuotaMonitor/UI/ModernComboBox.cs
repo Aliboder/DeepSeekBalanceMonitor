@@ -84,8 +84,7 @@ namespace QuotaMonitor.UI
                 AutoSize = false
             };
             _dropDown.Items.Add(host);
-            _dropDown.Size = new Size(Width, Math.Min(28 * _items.Length + 8, 168));
-            _list.Size = new Size(Width, _dropDown.Height - 8);
+            // 下拉框与列表尺寸在 ShowDropDown 弹出时按实际 Width 计算
         }
 
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _hovered = true; Invalidate(); }
@@ -96,6 +95,20 @@ namespace QuotaMonitor.UI
             base.OnMouseClick(e);
             if (e.Button != MouseButtons.Left) return;
             _list.SelectedIndex = _selectedIndex;
+            // 延迟到消息循环空闲再弹出：在鼠标点击消息处理中同步 Show 会被
+            // ToolStripDropDown 的 AutoClose 钩子误判为"点击外部"而立即关闭
+            BeginInvoke((Action)ShowDropDown);
+        }
+
+        private void ShowDropDown()
+        {
+            if (!_list.IsHandleCreated) _list.CreateControl();
+            int itemH = _list.GetItemHeight(0);
+            int h = Math.Min(itemH * _items.Length + 2, 200);
+            _dropDown.Size = new Size(Width, h);
+            _list.Size = new Size(Width, h);
+            var host = (ToolStripControlHost)_dropDown.Items[0];
+            host.Size = _list.Size;
             _dropDown.Show(this, new Point(0, Height + 1));
         }
 
