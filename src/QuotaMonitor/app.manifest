@@ -2,7 +2,8 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="QuotaMonitor.app"/>
 
-  <!-- 高 DPI 支持：SystemAware（系统级感知），高分屏文字清晰不模糊 -->
+  <!-- 高 DPI 支持：SystemAware（系统级感知）。界面全部使用原生控件 +
+       AutoScaleMode.Dpi，由 WinForms 统一缩放坐标与文字，物理像素 1:1 渲染不模糊。 -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
