@@ -1,7 +1,5 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using QuotaMonitor.Core;
 
@@ -212,60 +210,10 @@ namespace QuotaMonitor.UI
         // ============ 图标绘制 ============
 
         /// <summary>
-        /// 绘制托盘图标：深色渐变圆 + 状态色 ¥ 符号（48x48 高清，托盘缩放不模糊）。
-        /// ¥ 寓意"余额"，状态色（绿/红/橙/靛蓝）表达当前状态。
+        /// 托盘图标：深色渐变圆底 + 白色 Q + 状态色圆弧仪表（48x48 高清，托盘缩放不模糊）。
+        /// 圆弧颜色（绿/红/橙/靛蓝）表达当前状态，Q 保持品牌稳定。
         /// </summary>
-        private static Icon CreateTrayIcon(Color statusColor)
-        {
-            const int size = 48;
-            using (var bmp = new Bitmap(size, size))
-            {
-                using (var g = Graphics.FromImage(bmp))
-                {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-
-                    // 深色渐变圆底（中心亮、边缘暗，有立体感）
-                    var rect = new Rectangle(1, 1, size - 2, size - 2);
-                    using (var path = new GraphicsPath())
-                    {
-                        path.AddEllipse(rect);
-                        using (var brush = new PathGradientBrush(path)
-                        {
-                            CenterColor = Color.FromArgb(0x4A, 0x4A, 0x4A),
-                            SurroundColors = new[] { Color.FromArgb(0x18, 0x18, 0x18) }
-                        })
-                        {
-                            g.FillPath(brush, path);
-                        }
-                        // 细描边增强轮廓
-                        using (var pen = new Pen(Color.FromArgb(0x55, 0x55, 0x55), 1f))
-                        {
-                            g.DrawPath(pen, path);
-                        }
-                    }
-
-                    // 状态色 ¥ 符号
-                    using (var f = new Font("Segoe UI", 24f, FontStyle.Bold, GraphicsUnit.Pixel))
-                    using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                    {
-                        g.DrawString("¥", f, new SolidBrush(statusColor), new RectangleF(0, -1, size, size), sf);
-                    }
-                }
-                IntPtr hIcon = bmp.GetHicon();
-                try
-                {
-                    return (Icon)Icon.FromHandle(hIcon).Clone();
-                }
-                finally
-                {
-                    DestroyIcon(hIcon);
-                }
-            }
-        }
-
-        [DllImport("user32.dll")]
-        private static extern bool DestroyIcon(IntPtr hIcon);
+        private static Icon CreateTrayIcon(Color statusColor) => IconFactory.Create(48, statusColor);
 
         public void Dispose()
         {

@@ -1,22 +1,49 @@
-# Dev tool: generate app.ico (dark circle + green D)
-# Small sizes use BMP frames (required by csc), 256 uses PNG frame.
+# Dev tool: generate app.ico (dark gradient circle + white Q + teal arc gauge)
+# Same composition as IconFactory.cs in the app. Small sizes use BMP frames
+# (required by csc), 256 uses PNG frame.
 Add-Type -AssemblyName System.Drawing
 
 function New-IconBitmap([int]$size) {
     $bmp = New-Object System.Drawing.Bitmap($size, $size)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $bg = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 38, 38, 38))
-    $margin = [int]($size * 0.04)
-    $g.FillEllipse($bg, $margin, $margin, $size - 2 * $margin, $size - 2 * $margin)
-    $fontSize = [float]($size * 0.58)
+    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+
+    # dark gradient circle background
+    $w2 = $size - 2; $h2 = $size - 2
+    $rect = New-Object System.Drawing.Rectangle(1, 1, $w2, $h2)
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddEllipse($rect)
+    $bg = New-Object System.Drawing.Drawing2D.PathGradientBrush($path)
+    $bg.CenterColor = [System.Drawing.Color]::FromArgb(255, 74, 74, 74)
+    $bg.SurroundColors = @([System.Drawing.Color]::FromArgb(255, 24, 24, 24))
+    $g.FillPath($bg, $path)
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 85, 85, 85), 1)
+    $g.DrawPath($pen, $path)
+    $pen.Dispose(); $bg.Dispose(); $path.Dispose()
+
+    # arc gauge: start 315deg (top-right), sweep 270deg clockwise, teal->green gradient
+    $r = $size * 0.34
+    $w = [Math]::Max(2.0, $size * 0.09)
+    $cx = $size / 2.0; $cy = $size / 2.0
+    $x1 = $cx - $r; $y1 = $cy - $r; $w3 = $r * 2; $h3 = $r * 2
+    $arcRect = New-Object System.Drawing.RectangleF($x1, $y1, $w3, $h3)
+    $cLight = [System.Drawing.Color]::FromArgb(255, 41, 224, 208)
+    $cDark = [System.Drawing.Color]::FromArgb(255, 74, 222, 128)
+    $gb = New-Object System.Drawing.Drawing2D.LinearGradientBrush($arcRect, $cLight, $cDark, 90)
+    $apen = New-Object System.Drawing.Pen($gb, [float]$w)
+    $g.DrawArc($apen, $arcRect, -45, 270)
+    $apen.Dispose(); $gb.Dispose()
+
+    # white Q
+    $fontSize = [float]($size * 0.52)
     $font = New-Object System.Drawing.Font("Segoe UI", $fontSize, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 74, 222, 128))
+    $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
     $sf = New-Object System.Drawing.StringFormat
     $sf.Alignment = [System.Drawing.StringAlignment]::Center
     $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
-    $g.DrawString("D", $font, $brush, (New-Object System.Drawing.RectangleF(0, 0, $size, $size)), $sf)
-    $g.Dispose(); $font.Dispose(); $brush.Dispose(); $bg.Dispose()
+    $g.DrawString("Q", $font, $brush, (New-Object System.Drawing.RectangleF(0, -1, $size, $size)), $sf)
+    $g.Dispose(); $font.Dispose(); $brush.Dispose(); $sf.Dispose()
     return $bmp
 }
 
