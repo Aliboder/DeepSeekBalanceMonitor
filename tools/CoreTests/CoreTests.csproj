@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DeepSeekBalanceMonitor\DeepSeekBalanceMonitor.csproj" />
+    <ProjectReference Include="..\..\src\QuotaMonitor\QuotaMonitor.csproj" />
   </ItemGroup>
 
 </Project>

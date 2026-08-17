@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>QuotaMonitor</AssemblyName>
+    <RootNamespace>QuotaMonitor</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>QuotaMonitor</Authors>
+    <Description>QuotaMonitor - AI 额度监控：DeepSeek 余额与 OpenCode Go 套餐余量监控</Description>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <DebugType>embedded</DebugType>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 允许 .NET 8 SDK 编译 net48 目标（无需安装旧版 targeting pack） -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- JavaScriptSerializer（JSON 序列化）、DPAPI（密钥加密） -->
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+</Project>

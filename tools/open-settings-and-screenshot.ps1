@@ -17,7 +17,7 @@ public class Mouse {
 "@
 
 # 悬浮窗位置：读配置文件（默认屏幕中央）
-$cfgPath = "D:\SystemFiles\Documents\DeepSeek余额监控\设置.json"
+$cfgPath = "D:\SystemFiles\Documents\QuotaMonitor\设置.json"
 $fx = $null; $fy = $null
 try {
     $cfg = Get-Content $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json

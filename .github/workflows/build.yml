@@ -20,10 +20,10 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore
-        run: dotnet restore src/DeepSeekBalanceMonitor/DeepSeekBalanceMonitor.csproj
+        run: dotnet restore src/QuotaMonitor/QuotaMonitor.csproj
 
       - name: Build (Release)
-        run: dotnet build src/DeepSeekBalanceMonitor/DeepSeekBalanceMonitor.csproj -c Release --no-restore
+        run: dotnet build src/QuotaMonitor/QuotaMonitor.csproj -c Release --no-restore
 
       - name: Run core tests
         run: |
@@ -44,7 +44,7 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DeepSeekBalanceMonitor-Setup
+          name: QuotaMonitor-Setup
           path: installer/Output/*.exe
 
       - name: Publish GitHub Release (tags only)

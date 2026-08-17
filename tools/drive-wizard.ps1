@@ -7,7 +7,7 @@ public class WinKeys {
 }
 "@
 
-$proc = Get-Process 'DeepSeekBalanceMonitor-Setup*' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$proc = Get-Process 'QuotaMonitor-Setup*' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
 if (-not $proc) { Write-Host "NO WIZARD"; exit 1 }
 
 $hwnd = $proc.MainWindowHandle

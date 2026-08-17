@@ -47,7 +47,7 @@ function New-BmpFrame([System.Drawing.Bitmap]$bmp) {
     return $ms.ToArray()
 }
 
-$out = "D:\SystemFiles\Documents\Project\DEEPSEEK_MONEY\src\DeepSeekBalanceMonitor\app.ico"
+$out = "D:\SystemFiles\Documents\Project\DEEPSEEK_MONEY\src\QuotaMonitor\app.ico"
 $ms = New-Object System.IO.MemoryStream
 $bw = New-Object System.IO.BinaryWriter($ms)
 

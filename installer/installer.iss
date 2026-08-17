@@ -1,25 +1,25 @@
-; DeepSeek 余额监控 安装包脚本（Inno Setup 6）
-#define MyAppName "DeepSeek 余额监控"
+; QuotaMonitor（AI 额度监控）安装包脚本（Inno Setup 6）
+#define MyAppName "QuotaMonitor"
 #define MyAppVersion "1.0.0"
-#define MyAppExeName "DeepSeekBalanceMonitor.exe"
+#define MyAppExeName "QuotaMonitor.exe"
 
 [Setup]
 ; 唯一标识（个人工具，固定即可）
 AppId={{8F2B6C41-9A5E-4D3B-8C10-2E7F5A91B6D4}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppPublisher=DeepSeekBalanceMonitor
-DefaultDirName={localappdata}\DeepSeekBalanceMonitor
+AppPublisher=QuotaMonitor
+DefaultDirName={localappdata}\QuotaMonitor
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 ; 无需管理员权限（安装到当前用户目录）
 PrivilegesRequired=lowest
 OutputDir=Output
-OutputBaseFilename=DeepSeekBalanceMonitor-Setup-{#MyAppVersion}
+OutputBaseFilename=QuotaMonitor-Setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=..\src\DeepSeekBalanceMonitor\app.ico
+SetupIconFile=..\src\QuotaMonitor\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ; 仅 64 位系统（Windows 10/11 x64）
 ArchitecturesAllowed=x64compatible
@@ -35,7 +35,7 @@ Name: "chinesesimplified"; MessagesFile: "Languages\ChineseSimplified.isl"
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标："; Flags: unchecked
 
 [Files]
-Source: "..\src\DeepSeekBalanceMonitor\bin\Release\net48\DeepSeekBalanceMonitor.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\src\QuotaMonitor\bin\Release\net48\QuotaMonitor.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

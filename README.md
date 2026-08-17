@@ -1,4 +1,4 @@
-# DeepSeek 余额监控
+# QuotaMonitor
 
 一个小巧的 Windows 桌面工具：实时查看 DeepSeek API 账户余额，余额不足或消费异常时自动提醒，并记录消费历史供统计分析。
 
@@ -26,7 +26,7 @@
 
 ## 数据保存在哪里
 
-所有数据存放在 Windows 用户目录下 `AppData\Local\DeepSeekBalanceMonitor\`：
+所有数据存放在 Windows 用户目录下 `AppData\Local\QuotaMonitor\`：
 
 | 文件 | 内容 |
 |------|------|

@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
-using DeepSeekBalanceMonitor.Core;
+using QuotaMonitor.Core;
 
 namespace SmokeTest
 {
@@ -53,7 +53,7 @@ namespace SmokeTest
             try
             {
                 var dataRoot = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DeepSeek余额监控");
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "QuotaMonitor");
                 System.IO.Directory.CreateDirectory(dataRoot);
 
                 var svc = new ConfigService(System.IO.Path.Combine(dataRoot, "设置.json"));

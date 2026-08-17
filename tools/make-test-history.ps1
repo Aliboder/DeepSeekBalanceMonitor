@@ -1,5 +1,5 @@
 # 开发测试工具：生成"消费突增"模拟历史数据（勿在产品环境使用）
-$path = "D:\SystemFiles\Documents\DeepSeek余额监控\余额记录.json"
+$path = "D:\SystemFiles\Documents\QuotaMonitor\余额记录.json"
 
 $pairs = @(
     @('2026-07-30 18:00:00', 130),

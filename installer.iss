@@ -1,15 +1,15 @@
 [Setup]
-AppName=DeepSeek Balance Monitor
+AppName=QuotaMonitor
 AppVersion=1.1.0
-AppPublisher=DeepSeekBalanceMonitor
-DefaultDirName={autopf}\DeepSeekBalanceMonitor
-DefaultGroupName=DeepSeek Balance Monitor
+AppPublisher=QuotaMonitor
+DefaultDirName={autopf}\QuotaMonitor
+DefaultGroupName=QuotaMonitor
 OutputDir=installer
-OutputBaseFilename=DeepSeekBalanceMonitor-Setup-v1.1.0
+OutputBaseFilename=QuotaMonitor-Setup-v1.1.0
 Compression=lzma2
 SolidCompression=yes
-SetupIconFile=src\DeepSeekBalanceMonitor\app.ico
-UninstallDisplayIcon={app}\DeepSeekBalanceMonitor.exe
+SetupIconFile=src\QuotaMonitor\app.ico
+UninstallDisplayIcon={app}\QuotaMonitor.exe
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
@@ -22,12 +22,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加选项:"
 
 [Files]
-Source: "publish\Release\DeepSeekBalanceMonitor.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish\Release\DeepSeekBalanceMonitor.exe.config"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish\Release\QuotaMonitor.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish\Release\QuotaMonitor.exe.config"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\DeepSeek Balance Monitor"; Filename: "{app}\DeepSeekBalanceMonitor.exe"
-Name: "{autodesktop}\DeepSeek Balance Monitor"; Filename: "{app}\DeepSeekBalanceMonitor.exe"; Tasks: desktopicon
+Name: "{group}\QuotaMonitor"; Filename: "{app}\QuotaMonitor.exe"
+Name: "{autodesktop}\QuotaMonitor"; Filename: "{app}\QuotaMonitor.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\DeepSeekBalanceMonitor.exe"; Description: "启动程序"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\QuotaMonitor.exe"; Description: "启动程序"; Flags: nowait postinstall skipifsilent

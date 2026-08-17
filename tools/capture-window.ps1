@@ -1,4 +1,4 @@
-# 开发工具：PrintWindow 截取 DeepSeekBalanceMonitor 进程的可见窗口（被遮挡也能截）
+# 开发工具：PrintWindow 截取 QuotaMonitor 进程的可见窗口（被遮挡也能截）
 # 用法：-TitlePattern "统计" 按标题匹配；-Float 截取无标题的悬浮窗
 param([string]$TitlePattern = "统计", [switch]$Float)
 
@@ -16,7 +16,7 @@ public class WinCap2 {
 }
 "@
 
-$proc = Get-Process DeepSeekBalanceMonitor -ErrorAction SilentlyContinue | Select-Object -First 1
+$proc = Get-Process QuotaMonitor -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $proc) { Write-Host "NO PROCESS"; exit 1 }
 $targetPid = $proc.Id
 Write-Host "process id: $targetPid"
