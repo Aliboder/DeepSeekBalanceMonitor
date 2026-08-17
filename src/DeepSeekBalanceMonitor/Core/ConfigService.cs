@@ -36,6 +36,7 @@ namespace DeepSeekBalanceMonitor.Core
                         {
                             var cfg = doc.ToConfig();
                             cfg.ApiKey = DecryptKey(doc.ApiKeyEncrypted);
+                            cfg.OpenCodeGoApiKey = DecryptKey(doc.OpenCodeGoApiKeyEncrypted);
                             return cfg;
                         }
                     }
@@ -57,6 +58,7 @@ namespace DeepSeekBalanceMonitor.Core
                 {
                     var doc = ConfigDocument.FromConfig(cfg);
                     doc.ApiKeyEncrypted = EncryptKey(cfg.ApiKey);
+                    doc.OpenCodeGoApiKeyEncrypted = EncryptKey(cfg.OpenCodeGoApiKey);
                     File.WriteAllText(_path, Json.Serialize(doc));
                 }
                 catch (Exception ex)
@@ -100,10 +102,12 @@ namespace DeepSeekBalanceMonitor.Core
             public bool NotifyLowBalance { get; set; }
             public bool NotifySurge { get; set; }
             public string ApiKeyEncrypted { get; set; } = "";
+            public string OpenCodeGoApiKeyEncrypted { get; set; } = "";
             public int RefreshIntervalSeconds { get; set; }
             public bool AutoStart { get; set; }
             public bool LockMode { get; set; }
             public bool TopMost { get; set; }
+            public bool ShowRemaining { get; set; } = true;
             public int? FloatX { get; set; }
             public int? FloatY { get; set; }
             public int? StatsW { get; set; }
@@ -118,10 +122,12 @@ namespace DeepSeekBalanceMonitor.Core
                 NotifyLowBalance = c.NotifyLowBalance,
                 NotifySurge = c.NotifySurge,
                 ApiKeyEncrypted = "",
+                OpenCodeGoApiKeyEncrypted = "",
                 RefreshIntervalSeconds = c.RefreshIntervalSeconds,
                 AutoStart = c.AutoStart,
                 LockMode = c.LockMode,
                 TopMost = c.TopMost,
+                ShowRemaining = c.ShowRemaining,
                 FloatX = c.FloatPosition?.X,
                 FloatY = c.FloatPosition?.Y,
                 StatsW = c.StatsSize?.Width,
@@ -140,6 +146,7 @@ namespace DeepSeekBalanceMonitor.Core
                 AutoStart = AutoStart,
                 LockMode = LockMode,
                 TopMost = TopMost,
+                ShowRemaining = ShowRemaining,
                 FloatPosition = (FloatX.HasValue && FloatY.HasValue)
                     ? new System.Drawing.Point(FloatX.Value, FloatY.Value)
                     : (System.Drawing.Point?)null,

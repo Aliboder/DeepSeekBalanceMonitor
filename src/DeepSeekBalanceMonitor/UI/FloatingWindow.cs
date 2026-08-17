@@ -19,9 +19,16 @@ namespace DeepSeekBalanceMonitor.UI
         private Color _balanceTextColor = Color.FromArgb(0x4A, 0xDE, 0x80);
         private Font _balanceFont;
 
+        // 显示模式：false=余额，true=Go套餐
+        private bool _showSubscription;
+
+        // 当前显示的订阅窗口索引（0=5h, 1=周, 2=月）
+        private int _currentWindowIndex;
+
         // 拖动状态
         private bool _dragging;
         private Point _dragOffset;
+        private Point _mouseDownPos;
 
         /// <summary>双击请求打开统计面板。</summary>
         public event EventHandler OpenStatsRequested;
@@ -85,6 +92,21 @@ namespace DeepSeekBalanceMonitor.UI
         /// <summary>状态变化后调用：更新余额文字、颜色、详情。</summary>
         public void UpdateDisplay()
         {
+            if (_showSubscription)
+            {
+                UpdateSubscriptionDisplay();
+            }
+            else
+            {
+                UpdateBalanceDisplay();
+            }
+
+            UpdateSize();
+            Refresh();
+        }
+
+        private void UpdateBalanceDisplay()
+        {
             var m = _ctx.Monitor;
 
             switch (m.Status)
@@ -104,9 +126,65 @@ namespace DeepSeekBalanceMonitor.UI
                     _balanceTextColor = Color.FromArgb(0xFF, 0xA9, 0x4D); // 橙：异常
                     break;
             }
+        }
 
-            UpdateSize();
-            Refresh();
+        private void UpdateSubscriptionDisplay()
+        {
+            var sub = _ctx.SubMonitor;
+
+            if (!sub.IsConfigured)
+            {
+                _balanceText = "⚠ 未配置 Go Key";
+                _balanceTextColor = Color.FromArgb(0xFF, 0xA9, 0x4D);
+                return;
+            }
+
+            if (sub.Result == null || sub.Result.Windows.Count == 0)
+            {
+                _balanceText = sub.ErrorMessage != null ? "⚠ " + sub.ErrorMessage : "⚠ 查询中";
+                _balanceTextColor = Color.FromArgb(0xFF, 0xA9, 0x4D);
+                return;
+            }
+
+            // 确保索引有效
+            if (_currentWindowIndex >= sub.Result.Windows.Count)
+                _currentWindowIndex = 0;
+
+            var w = sub.Result.Windows[_currentWindowIndex];
+            string label;
+            switch (w.Kind)
+            {
+                case "session": label = "5h"; break;
+                case "weekly": label = "周"; break;
+                case "monthly": label = "月"; break;
+                default: label = w.Kind; break;
+            }
+
+            // 根据设置显示剩余额度或已用额度
+            int percent = _ctx.Config.ShowRemaining ? w.RemainingPercent : w.UsedPercent;
+            _balanceText = label + " " + percent + "%";
+
+            // 颜色根据当前显示的百分比（剩余额度用低值警告，已用额度用高值警告）
+            if (_ctx.Config.ShowRemaining)
+            {
+                // 剩余额度：低值=红色警告
+                if (percent <= 10)
+                    _balanceTextColor = Color.FromArgb(0xFF, 0x6B, 0x6B);
+                else if (percent <= 30)
+                    _balanceTextColor = Color.FromArgb(0xFF, 0xA9, 0x4D);
+                else
+                    _balanceTextColor = Color.FromArgb(0x4A, 0xDE, 0x80);
+            }
+            else
+            {
+                // 已用额度：高值=红色警告
+                if (percent >= 90)
+                    _balanceTextColor = Color.FromArgb(0xFF, 0x6B, 0x6B);
+                else if (percent >= 70)
+                    _balanceTextColor = Color.FromArgb(0xFF, 0xA9, 0x4D);
+                else
+                    _balanceTextColor = Color.FromArgb(0x4A, 0xDE, 0x80);
+            }
         }
 
         /// <summary>
@@ -229,6 +307,7 @@ namespace DeepSeekBalanceMonitor.UI
             base.OnMouseDown(e);
             if (e.Button == MouseButtons.Left)
             {
+                _mouseDownPos = MousePosition;
                 if (e.Clicks == 2)
                 {
                     // 双击打开统计（不进入拖动），清除第一击可能残留的拖动状态
@@ -255,12 +334,38 @@ namespace DeepSeekBalanceMonitor.UI
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
-            if (_dragging && e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Left)
             {
-                _dragging = false;
-                _ctx.Config.FloatPosition = Location; // 松手自动记住
-                _ctx.SaveConfig();
+                // 检测是否为点击（鼠标移动小于5像素）
+                int dx = Math.Abs(MousePosition.X - _mouseDownPos.X);
+                int dy = Math.Abs(MousePosition.Y - _mouseDownPos.Y);
+                bool isClick = dx < 5 && dy < 5;
+
+                if (isClick && _showSubscription)
+                {
+                    // 订阅模式下单击切换窗口
+                    _dragging = false;
+                    CycleSubscriptionWindow();
+                    return;
+                }
+
+                if (_dragging)
+                {
+                    _dragging = false;
+                    _ctx.Config.FloatPosition = Location; // 松手自动记住
+                    _ctx.SaveConfig();
+                }
             }
+        }
+
+        /// <summary>循环切换订阅窗口：5h → 周 → 月 → 5h → ...</summary>
+        private void CycleSubscriptionWindow()
+        {
+            var sub = _ctx.SubMonitor;
+            if (sub.Result == null || sub.Result.Windows.Count == 0) return;
+
+            _currentWindowIndex = (_currentWindowIndex + 1) % sub.Result.Windows.Count;
+            UpdateDisplay();
         }
 
         /// <summary>恢复显示悬浮窗（定时隐藏到期/托盘手动恢复时调用）。</summary>
@@ -323,10 +428,18 @@ namespace DeepSeekBalanceMonitor.UI
         private ToolStripMenuItem _menuSettings;
         private ToolStripMenuItem _menuHide;
         private ToolStripMenuItem _menuExit;
+        private ToolStripMenuItem _menuToggleMode;
 
         private void BuildMenu()
         {
             _menu = new ContextMenuStrip();
+
+            _menuToggleMode = new ToolStripMenuItem("切换到 Go 套餐", null, (s, e) =>
+            {
+                _showSubscription = !_showSubscription;
+                _menuToggleMode.Text = _showSubscription ? "切换到余额" : "切换到 Go 套餐";
+                UpdateDisplay();
+            });
 
             _menuSettings = new ToolStripMenuItem("设置...", null, (s, e) =>
                 OpenSettingsRequested?.Invoke(this, EventArgs.Empty));
@@ -341,6 +454,8 @@ namespace DeepSeekBalanceMonitor.UI
 
             _menuExit = new ToolStripMenuItem("退出", null, (s, e) => _ctx.ExitApp());
 
+            _menu.Items.Add(_menuToggleMode);
+            _menu.Items.Add(new ToolStripSeparator());
             _menu.Items.Add(_menuSettings);
             _menu.Items.Add(_menuHide);
             _menu.Items.Add(new ToolStripSeparator());

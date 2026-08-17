@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Windows.Forms;
 using DeepSeekBalanceMonitor.Core;
@@ -8,82 +9,93 @@ using DeepSeekBalanceMonitor.Core;
 namespace DeepSeekBalanceMonitor.UI
 {
     /// <summary>
-    /// 设置窗口：全部设置改动即时生效。含 API 密钥管理（测试/应用/清空）与开机自启。
-    /// 布局：所有控件使用组内相对坐标，组高度按内容自动计算，保证全部设置项完整显示。
+    /// 设置窗口（现代导航布局）：左侧导航 + 内容区，全部自绘控件。
     /// </summary>
     public class SettingsForm : Form
     {
         private readonly AppContext _ctx;
-        private readonly Timer _saveTimer; // 防抖保存：连续改动 800ms 后落盘
+        private readonly Timer _saveTimer;
 
-        // 跨方法使用的控件（其余控件均为局部变量）
         private TextBox _keyBox;
         private Label _lblKeyStatus;
+        private TextBox _goKeyBox;
+        private Label _lblGoKeyStatus;
 
-        // 布局：窗体级 Y 游标
-        private int _y = 12;
-
-        // 深色主题（构造时确定）
         private readonly bool _dark;
 
-        // 输入控件深色配色（WinForms 输入框默认白底，需显式设置）
+        private static readonly Color DarkBg = Color.FromArgb(0x1A, 0x1A, 0x1E);
+        private static readonly Color LightBg = Color.FromArgb(0xF2, 0xF2, 0xF5);
+        private static readonly Color DarkFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
+        private static readonly Color LightFg = Color.FromArgb(0x33, 0x33, 0x33);
         private static readonly Color DarkInputBg = Color.FromArgb(0x2D, 0x2D, 0x30);
         private static readonly Color DarkInputFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
+        private static readonly Color DarkInputBorder = Color.FromArgb(0x50, 0x50, 0x55);
+        private static readonly Color LightInputBorder = Color.FromArgb(0xC0, 0xC0, 0xC4);
+        private static readonly Color AccentBlue = Color.FromArgb(0x1F, 0x6F, 0xEB);
+
+        // 内容区面板（4 个）
+        private readonly Panel[] _pages = new Panel[4];
+
+        // 布局常量
+        private const int SidebarW = 112;
+        private const int ContentLeft = SidebarW + 20;
+        private const int ContentTop = 16;
+        private const int ContentW = 420;
 
         public SettingsForm(AppContext ctx)
         {
             _ctx = ctx;
 
-            Text = "设置 - DeepSeek 余额监控";
+            Text = "设置";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(460, 400);
-            Font = new Font("Microsoft YaHei UI", 9);
-
-            // 主题跟随系统：深色系统下设置页也使用深色背景（标题栏已由 DarkTitleBar 处理）
-            _dark = SystemTheme.IsDark();
-            if (_dark)
-            {
-                BackColor = Color.FromArgb(0x1E, 0x1E, 0x1E);
-                ForeColor = Color.FromArgb(0xDD, 0xDD, 0xDD);
-            }
-            else
-            {
-                BackColor = Color.White;
-                ForeColor = Color.FromArgb(0x33, 0x33, 0x33);
-            }
-
-            // 关键：关闭自动缩放（与悬浮窗一致）——高分屏下由系统统一缩放，
-            // 避免 AutoScale 叠加导致控件错位、文字被按钮截断
+            Font = new Font("Microsoft YaHei UI", 9f);
             AutoScaleMode = AutoScaleMode.None;
 
-            // 高分屏（125%/150% 缩放）下窗口可能超出屏幕高度：
-            // 开启自动滚动，内容超高时出现滚动条，保证所有设置项可见
-            AutoScroll = true;
-            AutoScrollMargin = new Size(0, 8);
+            _dark = SystemTheme.IsDark();
+            BackColor = _dark ? DarkBg : LightBg;
+            ForeColor = _dark ? DarkFg : LightFg;
 
             _saveTimer = new Timer { Interval = 800 };
             _saveTimer.Tick += (s, e) => { _saveTimer.Stop(); _ctx.SaveConfig(); };
 
-            BuildDisplayGroup();
-            BuildAlertGroup();
-            BuildKeyGroup();
-            BuildOtherGroup();
+            ClientSize = new Size(ContentLeft + ContentW + 20, 520);
 
-            // 底部：打开数据文件夹
-            var btnOpenData = new Button { Text = "打开数据文件夹", Width = 130, Height = 30, Location = new Point(14, _y + 6) };
-
-            // 版本信息
-            var lblVersion = new Label
+            // 左侧导航
+            var nav = new NavSidebar(_dark)
             {
-                AutoSize = true,
-                Text = "版本 " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version,
-                Location = new Point(310, _y + 12),
-                ForeColor = SystemTheme.IsDark() ? Color.FromArgb(0x8A, 0x8A, 0x8A) : Color.Gray
+                Location = new Point(0, 0),
+                Height = ClientSize.Height - 46
             };
-            Controls.Add(lblVersion);
+            nav.ItemSelected += (s, idx) => ShowPage(idx);
+            Controls.Add(nav);
+
+            // 内容区
+            for (int i = 0; i < 4; i++)
+            {
+                _pages[i] = new Panel
+                {
+                    Location = new Point(ContentLeft, ContentTop),
+                    Size = new Size(ContentW, ClientSize.Height - ContentTop - 60),
+                    BackColor = _dark ? Color.FromArgb(0x1E, 0x1E, 0x22) : Color.FromArgb(0xF7, 0xF7, 0xF9)
+                };
+                Controls.Add(_pages[i]);
+                _pages[i].Visible = (i == 0);
+            }
+
+            BuildDisplayPage();
+            BuildAlertPage();
+            BuildKeyPage();
+            BuildOtherPage();
+
+            // 底部栏
+            var footerY = ClientSize.Height - 42;
+            var btnOpenData = new CardButton(_dark, "打开数据文件夹", 130, 28)
+            {
+                Location = new Point(ContentLeft, footerY)
+            };
             btnOpenData.Click += (s, e) =>
             {
                 try
@@ -98,211 +110,266 @@ namespace DeepSeekBalanceMonitor.UI
             };
             Controls.Add(btnOpenData);
 
-            // 窗口高度上限：按屏幕工作区物理高度换算为逻辑高度，高分屏下不超出屏幕；
-            // 超出部分由滚动条查看
-            int maxClientH = 640;
-            try
+            var lblVersion = new Label
             {
-                var wa = Screen.PrimaryScreen.WorkingArea;
-                // 用桌面 HDC 取系统真实 DPI（窗口句柄未创建时 CreateGraphics 会误报 96）
-                using (var g = Graphics.FromHwnd(IntPtr.Zero))
-                {
-                    double scale = Math.Max(1.0, g.DpiY / 96.0);
-                    maxClientH = Math.Max(360, (int)((wa.Height - 100) / scale));
-                }
-            }
-            catch { }
-
-            ClientSize = new Size(460, Math.Min(_y + 48, maxClientH));
-            // 滚动范围 = 全部内容高度（含底部按钮），屏幕矮时通过滚动条查看
-            AutoScrollMinSize = new Size(0, _y + 40);
+                AutoSize = true,
+                Text = "v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3),
+                Location = new Point(ContentLeft + ContentW - 55, footerY + 6),
+                ForeColor = _dark ? Color.FromArgb(0x66, 0x66, 0x66) : Color.FromArgb(0xAA, 0xAA, 0xAA)
+            };
+            Controls.Add(lblVersion);
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            DarkTitleBar.Apply(Handle); // 标题栏跟随系统主题
+            DarkTitleBar.Apply(Handle);
         }
 
-        // ============ 布局构建 ============
-
-        /// <summary>添加一个分组框，返回组内控件起始 Y（标题下方）。</summary>
-        private GroupBox AddGroup(string title)
+        private void ShowPage(int index)
         {
-            var g = new GroupBox { Text = title, Location = new Point(12, _y), Size = new Size(436, 40) };
-            Controls.Add(g);
-            return g;
+            for (int i = 0; i < 4; i++)
+                _pages[i].Visible = (i == index);
         }
 
-        /// <summary>按内容实际高度收尾分组框，并把窗体游标推进到组底（供下一组/按钮定位）。</summary>
-        private void FinishGroup(GroupBox g, int innerY)
+        // ============ 内容构建辅助 ============
+
+        private Label AddCaption(Panel page, string text, int y)
         {
-            g.Height = innerY + 8;
-            _y = g.Bottom + 10;
+            var lbl = new Label
+            {
+                Text = text,
+                AutoSize = true,
+                Location = new Point(4, y),
+                ForeColor = _dark ? Color.FromArgb(0xBB, 0xBB, 0xBB) : Color.FromArgb(0x55, 0x55, 0x55)
+            };
+            page.Controls.Add(lbl);
+            return lbl;
         }
 
-        private CheckBox AddCheck(GroupBox g, string text, bool checkedValue, ref int y, Action<bool> onChanged)
-        {
-            var chk = new CheckBox { Text = text, AutoSize = true, Location = new Point(14, y), Checked = checkedValue };
-            chk.CheckedChanged += (s, e) => onChanged(chk.Checked);
-            g.Controls.Add(chk);
-            y += 28;
-            return chk;
-        }
-
-        private (TrackBar tb, Label lbl) AddSlider(GroupBox g, string caption, int min, int max, int value,
+        private void AddSliderRow(Panel page, string caption, int min, int max, int value,
             ref int y, Func<int, string> fmt)
         {
-            g.Controls.Add(new Label { Text = caption + "：", AutoSize = true, Location = new Point(14, y + 6) });
-            var valueLabel = new Label { AutoSize = true, Location = new Point(300, y + 6), ForeColor = Color.FromArgb(0x1F, 0x6F, 0xEB), Font = new Font(Font, FontStyle.Bold) };
-            // 关键：TrackBar 默认 AutoSize=true，高 DPI 下高度自动放大到 69px，
-            // 与相邻滑杆重叠（"滑杆消失/界面乱"的根因）。
-            // 必须 AutoSize=false + 固定 30px，三根滑杆才互不重叠。
-            // 顺序关键：必须先 AutoSize=false 再设 Height，否则 Height 被 AutoSize 覆盖
-            var tb = new TrackBar { AutoSize = false, Height = 30 };
-            tb.Minimum = min; tb.Maximum = max; tb.Value = value;
-            tb.Location = new Point(100, y); tb.Width = 180;
-            tb.TickStyle = TickStyle.None;
-            g.Controls.Add(tb);
-            g.Controls.Add(valueLabel);
+            AddCaption(page, caption, y + 2);
+            var valueLabel = new Label
+            {
+                AutoSize = true,
+                Location = new Point(360, y + 2),
+                ForeColor = AccentBlue,
+                Font = new Font(Font.FontFamily, 9f, FontStyle.Bold)
+            };
+            page.Controls.Add(valueLabel);
 
-            void RefreshLabel() => valueLabel.Text = fmt(tb.Value);
+            var slider = new ModernSlider(_dark, min, max, value)
+            {
+                Location = new Point(110, y),
+                Width = 230
+            };
+            void RefreshLabel() => valueLabel.Text = fmt(slider.Value);
             RefreshLabel();
-            tb.ValueChanged += (s, e) => { RefreshLabel(); OnSliderChanged(caption, tb.Value); };
-            tb.MouseUp += (s, e) => MarkDirty();
+            slider.ValueChanged += (s, v) => { RefreshLabel(); OnSliderChanged(caption, v); };
+            slider.DragEnded += (s, e) => MarkDirty();
+            page.Controls.Add(slider);
 
-            y += 38;
-            return (tb, valueLabel);
+            y += 36;
         }
 
-        private void BuildDisplayGroup()
+        private void AddCheckRow(Panel page, string text, bool checkedValue, ref int y, Action<bool> onChanged)
         {
-            var g = AddGroup("显示");
-            int y = 24;
-            AddSlider(g, "字体大小", 12, 48, _ctx.Config.FontSize, ref y, v => v + " 号");
-            AddSlider(g, "整体透明度", 30, 100, _ctx.Config.Opacity, ref y, v => v + " %");
-            AddSlider(g, "鼠标离开暗度", 10, 100, _ctx.Config.IdleOpacity, ref y, v => v + " %");
-            FinishGroup(g, y);
+            var chk = new ModernCheckBox(_dark, text)
+            {
+                Location = new Point(2, y - 2)
+            };
+            chk.CheckedChanged += (s, v) => onChanged(v);
+            chk.Checked = checkedValue;
+            page.Controls.Add(chk);
+            y += 30;
         }
 
-        private void BuildAlertGroup()
+        private TextBox AddKeyRow(Panel page, string value, ref int y)
         {
-            var g = AddGroup("余额提醒");
-            int y = 26;
+            var box = new TextBox
+            {
+                Location = new Point(2, y),
+                Width = 320,
+                UseSystemPasswordChar = true,
+                Text = value,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            if (_dark)
+            {
+                box.BackColor = DarkInputBg;
+                box.ForeColor = DarkInputFg;
+            }
+            page.Controls.Add(box);
 
-            g.Controls.Add(new Label { Text = "预警阈值：", AutoSize = true, Location = new Point(14, y + 4) });
+            var chk = new ModernCheckBox(_dark, "显示")
+            {
+                Location = new Point(330, y + 2)
+            };
+            chk.CheckedChanged += (s, v) => box.UseSystemPasswordChar = !v;
+            page.Controls.Add(chk);
+            y += 34;
+            return box;
+        }
+
+        private void AddButtonRow(Panel page, string[] labels, Action[] handlers, ref int y)
+        {
+            int x = 2;
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var btn = new CardButton(_dark, labels[i], 72, 28)
+                {
+                    Location = new Point(x, y),
+                    IsAccent = (labels[i] == "应用")
+                };
+                int idx = i;
+                btn.Click += (s, e) => handlers[idx]();
+                page.Controls.Add(btn);
+                x += 80;
+            }
+            y += 36;
+        }
+
+        private Label AddStatusLine(Panel page, ref int y)
+        {
+            var lbl = new Label
+            {
+                AutoSize = false,
+                Location = new Point(4, y),
+                Width = ContentW - 12,
+                Height = 22,
+                ForeColor = _dark ? Color.FromArgb(0x88, 0x88, 0x88) : Color.Gray
+            };
+            page.Controls.Add(lbl);
+            y += 28;
+            return lbl;
+        }
+
+        // ============ 四个页面 ============
+
+        private void BuildDisplayPage()
+        {
+            var p = _pages[0];
+            int y = 20;
+            AddSliderRow(p, "字体大小", 12, 48, _ctx.Config.FontSize, ref y, v => v + " 号");
+            AddSliderRow(p, "整体透明度", 30, 100, _ctx.Config.Opacity, ref y, v => v + " %");
+            AddSliderRow(p, "鼠标离开暗度", 10, 100, _ctx.Config.IdleOpacity, ref y, v => v + " %");
+            AddCheckRow(p, "套餐窗口显示剩余额度（关闭则显示已用额度）", _ctx.Config.ShowRemaining, ref y,
+                v => { _ctx.Config.ShowRemaining = v; _ctx.FloatWindow.UpdateDisplay(); MarkDirty(); });
+        }
+
+        private void BuildAlertPage()
+        {
+            var p = _pages[1];
+            int y = 20;
+
+            AddCaption(p, "预警阈值", y + 4);
             var numThreshold = new NumericUpDown
             {
-                Location = new Point(110, y), Width = 110, Minimum = 0, Maximum = 99999.99m,
-                DecimalPlaces = 2, Value = Math.Min(_ctx.Config.WarnThreshold, 99999.99m)
+                Location = new Point(90, y),
+                Width = 100,
+                Minimum = 0,
+                Maximum = 99999.99m,
+                DecimalPlaces = 2,
+                Value = Math.Min(_ctx.Config.WarnThreshold, 99999.99m)
             };
             if (_dark)
             {
                 numThreshold.BackColor = DarkInputBg;
                 numThreshold.ForeColor = DarkInputFg;
             }
-            g.Controls.Add(numThreshold);
-            g.Controls.Add(new Label { Text = "元", AutoSize = true, Location = new Point(228, y + 4) });
+            p.Controls.Add(numThreshold);
+            p.Controls.Add(new Label
+            {
+                Text = "元",
+                AutoSize = true,
+                Location = new Point(198, y + 4),
+                ForeColor = _dark ? Color.FromArgb(0x88, 0x88, 0x88) : Color.Gray
+            });
             numThreshold.ValueChanged += (s, e) =>
             {
                 _ctx.Config.WarnThreshold = numThreshold.Value;
-                _ctx.Monitor.SetWarnThreshold(numThreshold.Value); // 悬浮窗颜色立即更新
+                _ctx.Monitor.SetWarnThreshold(numThreshold.Value);
                 MarkDirty();
             };
-            y += 36;
+            y += 38;
 
-            AddCheck(g, "余额低于阈值时弹出通知", _ctx.Config.NotifyLowBalance, ref y,
+            AddCheckRow(p, "余额低于阈值时弹出通知", _ctx.Config.NotifyLowBalance, ref y,
                 v => { _ctx.Config.NotifyLowBalance = v; MarkDirty(); });
-            AddCheck(g, "消费突增时弹出通知", _ctx.Config.NotifySurge, ref y,
+            AddCheckRow(p, "消费突增时弹出通知", _ctx.Config.NotifySurge, ref y,
                 v => { _ctx.Config.NotifySurge = v; MarkDirty(); });
-
-            FinishGroup(g, y);
         }
 
-        private void BuildKeyGroup()
+        private void BuildKeyPage()
         {
-            var g = AddGroup("API 密钥");
-            int y = 26;
+            var p = _pages[2];
+            int y = 20;
 
-            _keyBox = new TextBox
+            // DeepSeek 区块
+            AddCaption(p, "DeepSeek API", y);
+            y += 24;
+            _keyBox = AddKeyRow(p, _ctx.Config.ApiKey, ref y);
+            AddButtonRow(p,
+                new[] { "测试", "应用", "清空" },
+                new Action[] { () => OnTestKey(), () => OnApplyKey(), () => OnClearKey() },
+                ref y);
+            _lblKeyStatus = AddStatusLine(p, ref y);
+            y += 8;
+
+            // 分隔线
+            var sep = new Panel
             {
-                Location = new Point(14, y), Width = 320,
-                UseSystemPasswordChar = true,
-                Text = _ctx.Config.ApiKey
+                Location = new Point(4, y),
+                Size = new Size(ContentW - 8, 1),
+                BackColor = _dark ? Color.FromArgb(0x35, 0x35, 0x3A) : Color.FromArgb(0xDD, 0xDD, 0xE0)
             };
-            if (_dark)
-            {
-                _keyBox.BackColor = DarkInputBg;
-                _keyBox.ForeColor = DarkInputFg;
-            }
-            g.Controls.Add(_keyBox);
-            var chkShowKey = new CheckBox { Text = "显示密钥", AutoSize = true, Location = new Point(340, y + 3) };
-            chkShowKey.CheckedChanged += (s, e) => _keyBox.UseSystemPasswordChar = !chkShowKey.Checked;
-            g.Controls.Add(chkShowKey);
-            y += 36;
+            p.Controls.Add(sep);
+            y += 16;
 
-            var btnTest = new Button { Text = "测试", Location = new Point(14, y), Width = 75, Height = 30 };
-            var btnApply = new Button { Text = "应用", Location = new Point(98, y), Width = 75, Height = 30 };
-            var btnClear = new Button { Text = "清空", Location = new Point(182, y), Width = 75, Height = 30 };
-            btnTest.Click += OnTestKey;
-            btnApply.Click += OnApplyKey;
-            btnClear.Click += OnClearKey;
-            g.Controls.Add(btnTest);
-            g.Controls.Add(btnApply);
-            g.Controls.Add(btnClear);
-            y += 38;
-
-            _lblKeyStatus = new Label
-            {
-                AutoSize = false, Location = new Point(14, y), Width = 420, Height = 32,
-                ForeColor = Color.Gray
-            };
-            g.Controls.Add(_lblKeyStatus);
-            y += 38;
-
-            FinishGroup(g, y);
+            // Go 区块
+            AddCaption(p, "OpenCode Go API", y);
+            y += 24;
+            _goKeyBox = AddKeyRow(p, _ctx.Config.OpenCodeGoApiKey, ref y);
+            AddButtonRow(p,
+                new[] { "测试", "应用", "清空" },
+                new Action[] { () => OnTestGoKey(), () => OnApplyGoKey(), () => OnClearGoKey() },
+                ref y);
+            _lblGoKeyStatus = AddStatusLine(p, ref y);
         }
 
-        private void BuildOtherGroup()
+        private void BuildOtherPage()
         {
-            var g = AddGroup("其他");
-            int y = 26;
+            var p = _pages[3];
+            int y = 20;
 
-            g.Controls.Add(new Label { Text = "刷新间隔：", AutoSize = true, Location = new Point(14, y + 4) });
-            var cmbInterval = new ComboBox
-            {
-                Location = new Point(110, y), Width = 130, DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            if (_dark)
-            {
-                cmbInterval.BackColor = DarkInputBg;
-                cmbInterval.ForeColor = DarkInputFg;
-            }
+            AddCaption(p, "刷新间隔", y + 4);
             string[] labels = { "5 秒", "15 秒", "30 秒", "1 分钟", "1 分 30 秒", "2 分钟" };
-            for (int i = 0; i < Config.RefreshIntervals.Length; i++)
-                cmbInterval.Items.Add(labels[i]);
             int sel = Array.IndexOf(Config.RefreshIntervals, _ctx.Config.RefreshIntervalSeconds);
-            cmbInterval.SelectedIndex = sel >= 0 ? sel : 2;
-            cmbInterval.SelectedIndexChanged += (s, e) =>
+            var cmb = new ModernComboBox(_dark, labels, sel >= 0 ? sel : 2)
             {
-                _ctx.Config.RefreshIntervalSeconds = Config.RefreshIntervals[cmbInterval.SelectedIndex];
+                Location = new Point(90, y),
+                Width = 130
+            };
+            cmb.SelectedIndexChanged += (s, idx) =>
+            {
+                _ctx.Config.RefreshIntervalSeconds = Config.RefreshIntervals[idx];
                 _ctx.Monitor.SetInterval(_ctx.Config.RefreshIntervalSeconds);
                 MarkDirty();
             };
-            g.Controls.Add(cmbInterval);
-            y += 36;
+            p.Controls.Add(cmb);
+            y += 38;
 
-            AddCheck(g, "开机自动启动", _ctx.Config.AutoStart, ref y, v =>
+            AddCheckRow(p, "开机自动启动", _ctx.Config.AutoStart, ref y, v =>
             {
                 _ctx.Config.AutoStart = v;
                 AutoStartService.SetEnabled(v);
                 MarkDirty();
             });
-
-            FinishGroup(g, y);
         }
 
-        /// <summary>滑杆拖动中即时预览（不落盘），松手时统一保存。</summary>
+        // ============ 滑杆 & 保存 ============
+
         private void OnSliderChanged(string caption, int value)
         {
             var cfg = _ctx.Config;
@@ -330,66 +397,130 @@ namespace DeepSeekBalanceMonitor.UI
             _saveTimer.Start();
         }
 
-        // ============ 密钥管理 ============
+        // ============ DeepSeek 密钥 ============
 
-        private async void OnTestKey(object sender, EventArgs e)
+        private void OnTestKey()
         {
             var key = _keyBox.Text.Trim();
-            if (string.IsNullOrEmpty(key))
-            {
-                SetKeyStatus("请先输入密钥", true);
-                return;
-            }
-            SetKeyStatus("正在测试密钥...", false);
+            if (string.IsNullOrEmpty(key)) { SetKeyStatus("请先输入密钥", true); return; }
+            SetKeyStatus("正在测试...", false);
+            _ = TestKeyAsync(key);
+        }
+
+        private async System.Threading.Tasks.Task TestKeyAsync(string key)
+        {
             try
             {
                 var result = await _ctx.Api.GetBalanceAsync(key);
-                SetKeyStatus("✅ 密钥有效，当前余额 ¥" + result.TotalBalance.ToString("F2"), false);
+                SetKeyStatus("密钥有效，余额 ¥" + result.TotalBalance.ToString("F2"), false);
             }
             catch (BalanceQueryException ex)
             {
-                SetKeyStatus("❌ " + ex.Message, true);
+                SetKeyStatus(ex.Message, true);
             }
         }
 
-        private void OnApplyKey(object sender, EventArgs e)
+        private void OnApplyKey()
         {
             var key = _keyBox.Text.Trim();
-            if (string.IsNullOrEmpty(key))
-            {
-                OnClearKey(sender, e);
-                return;
-            }
+            if (string.IsNullOrEmpty(key)) { OnClearKey(); return; }
             string tail = key.Length >= 4 ? key.Substring(key.Length - 4) : key;
-            if (MessageBox.Show(this,
-                    "确认应用此 API 密钥（末 4 位：" + tail + "）？\n应用后将立即刷新余额。",
-                    "确认密钥", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (MessageBox.Show(this, "确认应用此密钥（末 4 位：" + tail + "）？",
+                "确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
             _ctx.Config.ApiKey = key;
             _ctx.SaveConfig();
-            _ctx.Monitor.SetApiKey(key); // 立即用新密钥查询，不等下一个刷新周期
-            SetKeyStatus("已应用，正在刷新余额...", false);
+            _ctx.Monitor.SetApiKey(key);
+            SetKeyStatus("已应用", false);
         }
 
-        private void OnClearKey(object sender, EventArgs e)
+        private void OnClearKey()
         {
-            if (MessageBox.Show(this,
-                    "确定清空 API 密钥吗？\n清空后将停止查询余额。",
-                    "确认清空", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (MessageBox.Show(this, "确定清空密钥吗？", "确认",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
             _ctx.Config.ApiKey = "";
             _ctx.SaveConfig();
             _ctx.Monitor.SetApiKey("");
             _keyBox.Text = "";
-            SetKeyStatus("密钥已清空，余额查询已停止", false);
+            SetKeyStatus("已清空", false);
         }
 
         private void SetKeyStatus(string text, bool error)
         {
             _lblKeyStatus.Text = text;
-            _lblKeyStatus.ForeColor = error ? Color.FromArgb(0xC0, 0x39, 0x2B) : Color.FromArgb(0x1E, 0x84, 0x41);
+            _lblKeyStatus.ForeColor = error
+                ? Color.FromArgb(0xE0, 0x4B, 0x4B)
+                : Color.FromArgb(0x4A, 0xDE, 0x80);
+        }
+
+        // ============ Go 密钥 ============
+
+        private void OnTestGoKey()
+        {
+            var key = _goKeyBox.Text.Trim();
+            if (string.IsNullOrEmpty(key)) { SetGoKeyStatus("请先输入密钥", true); return; }
+            SetGoKeyStatus("正在测试...", false);
+            _ = TestGoKeyAsync(key);
+        }
+
+        private async System.Threading.Tasks.Task TestGoKeyAsync(string key)
+        {
+            try
+            {
+                var result = await _ctx.GoClient.GetUsageAsync(key);
+                if (result.Windows.Count > 0)
+                {
+                    var parts = new System.Collections.Generic.List<string>();
+                    foreach (var w in result.Windows)
+                        parts.Add(w.DisplayName + " " + w.RemainingPercent + "%");
+                    SetGoKeyStatus("密钥有效，" + string.Join(" / ", parts), false);
+                }
+                else
+                    SetGoKeyStatus("密钥有效，但无窗口数据", false);
+            }
+            catch (BalanceQueryException ex)
+            {
+                SetGoKeyStatus(ex.Message, true);
+            }
+        }
+
+        private void OnApplyGoKey()
+        {
+            var key = _goKeyBox.Text.Trim();
+            if (string.IsNullOrEmpty(key)) { OnClearGoKey(); return; }
+            string tail = key.Length >= 4 ? key.Substring(key.Length - 4) : key;
+            if (MessageBox.Show(this, "确认应用此 Go 密钥（末 4 位：" + tail + "）？",
+                "确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            _ctx.Config.OpenCodeGoApiKey = key;
+            _ctx.SaveConfig();
+            _ctx.SubMonitor.SetApiKey(key);
+            SetGoKeyStatus("已应用", false);
+        }
+
+        private void OnClearGoKey()
+        {
+            if (MessageBox.Show(this, "确定清空 Go 密钥吗？", "确认",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            _ctx.Config.OpenCodeGoApiKey = "";
+            _ctx.SaveConfig();
+            _ctx.SubMonitor.SetApiKey("");
+            _goKeyBox.Text = "";
+            SetGoKeyStatus("已清空", false);
+        }
+
+        private void SetGoKeyStatus(string text, bool error)
+        {
+            _lblGoKeyStatus.Text = text;
+            _lblGoKeyStatus.ForeColor = error
+                ? Color.FromArgb(0xE0, 0x4B, 0x4B)
+                : Color.FromArgb(0x4A, 0xDE, 0x80);
         }
     }
 }

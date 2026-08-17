@@ -50,5 +50,11 @@ namespace DeepSeekBalanceMonitor.Core
 
         /// <summary>统计窗口尺寸，null 表示默认尺寸。</summary>
         public Size? StatsSize { get; set; } = null;
+
+        /// <summary>OpenCode Go API 密钥（落盘前由 ConfigService 加密）。</summary>
+        public string OpenCodeGoApiKey { get; set; } = "";
+
+        /// <summary>套餐窗口显示模式：true=剩余额度，false=已用额度。</summary>
+        public bool ShowRemaining { get; set; } = true;
     }
 }

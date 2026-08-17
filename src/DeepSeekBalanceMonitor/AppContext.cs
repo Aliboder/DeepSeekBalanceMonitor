@@ -22,7 +22,9 @@ namespace DeepSeekBalanceMonitor
         public Config Config { get; private set; }
         public HistoryStore History { get; }
         public DeepSeekApiClient Api { get; }
+        public OpenCodeGoClient GoClient { get; }
         public BalanceMonitor Monitor { get; private set; }
+        public SubscriptionMonitor SubMonitor { get; private set; }
         public FloatingWindow FloatWindow { get; private set; }
         public TrayIcon Tray { get; private set; }
         public HideService HideService { get; private set; }
@@ -43,14 +45,20 @@ namespace DeepSeekBalanceMonitor
             Config = ConfigService.Load();
             History = new HistoryStore(HistoryPath);
             Api = new DeepSeekApiClient();
+            GoClient = new OpenCodeGoClient();
 
             // —— 轮询调度 + 悬浮窗 + 托盘 ——
             Monitor = new BalanceMonitor(Api, History, Config.ApiKey, Config.WarnThreshold);
+            SubMonitor = new SubscriptionMonitor(GoClient, Config.OpenCodeGoApiKey);
             FloatWindow = new FloatingWindow(this);
             Monitor.StateChanged += (s, e) =>
             {
                 FloatWindow.UpdateDisplay();
                 Tray.UpdateFromMonitor();
+            };
+            SubMonitor.StateChanged += (s, e) =>
+            {
+                FloatWindow.UpdateDisplay();
             };
             FloatWindow.Show();
 
@@ -82,6 +90,7 @@ namespace DeepSeekBalanceMonitor
             AutoStartService.Sync(Config);
 
             Monitor.Start(Config.RefreshIntervalSeconds);
+            SubMonitor.Start(Config.RefreshIntervalSeconds);
 
             Log.Info("程序启动");
         }
@@ -132,6 +141,7 @@ namespace DeepSeekBalanceMonitor
         {
             Log.Info("程序退出");
             Monitor?.Stop();
+            SubMonitor?.Stop();
             HideService?.Dispose();
             Tray?.Dispose();
             ExitThread();
