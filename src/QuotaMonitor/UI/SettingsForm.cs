@@ -20,18 +20,25 @@ namespace QuotaMonitor.UI
         private Label _lblKeyStatus;
         private TextBox _goKeyBox;
         private Label _lblGoKeyStatus;
+        private NavSidebar _nav;
 
-        private readonly bool _dark;
+        private bool _dark;
 
-        private static readonly Color DarkBg = Color.FromArgb(0x1A, 0x1A, 0x1E);
-        private static readonly Color LightBg = Color.FromArgb(0xF2, 0xF2, 0xF5);
-        private static readonly Color DarkFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
-        private static readonly Color LightFg = Color.FromArgb(0x33, 0x33, 0x33);
-        private static readonly Color DarkInputBg = Color.FromArgb(0x2D, 0x2D, 0x30);
-        private static readonly Color DarkInputFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
-        private static readonly Color DarkInputBorder = Color.FromArgb(0x50, 0x50, 0x55);
-        private static readonly Color LightInputBorder = Color.FromArgb(0xC0, 0xC0, 0xC4);
-        private static readonly Color AccentBlue = Color.FromArgb(0x1F, 0x6F, 0xEB);
+        // 配色（Win11 风格）
+        private static readonly Color DarkBg = Color.FromArgb(0x20, 0x20, 0x20);
+        private static readonly Color LightBg = Color.White;
+        private static readonly Color DarkFg = Color.FromArgb(0xE0, 0xE0, 0xE0);
+        private static readonly Color LightFg = Color.FromArgb(0x1A, 0x1A, 0x1A);
+        private static readonly Color DarkInputBg = Color.FromArgb(0x32, 0x32, 0x32);
+        private static readonly Color DarkInputFg = Color.FromArgb(0xE0, 0xE0, 0xE0);
+        private static readonly Color DarkInputBorder = Color.FromArgb(0x4A, 0x4A, 0x4A);
+        private static readonly Color LightInputBorder = Color.FromArgb(0xC7, 0xC7, 0xC7);
+        private static readonly Color AccentBlue = Color.FromArgb(0x00, 0x67, 0xC0);
+        // Win11 次要 / 三级文字
+        private static readonly Color DarkCaption = Color.FromArgb(0xA0, 0xA0, 0xA0);
+        private static readonly Color LightCaption = Color.FromArgb(0x5C, 0x5C, 0x5C);
+        private static readonly Color DarkMuted = Color.FromArgb(0x9D, 0x9D, 0x9D);
+        private static readonly Color LightMuted = Color.FromArgb(0x6E, 0x6E, 0x6E);
 
         // 内容区面板（4 个）
         private readonly Panel[] _pages = new Panel[4];
@@ -64,13 +71,13 @@ namespace QuotaMonitor.UI
             ClientSize = new Size(ContentLeft + ContentW + 20, 520);
 
             // 左侧导航
-            var nav = new NavSidebar(_dark)
+            _nav = new NavSidebar(_dark)
             {
                 Location = new Point(0, 0),
                 Height = ClientSize.Height - 46
             };
-            nav.ItemSelected += (s, idx) => ShowPage(idx);
-            Controls.Add(nav);
+            _nav.ItemSelected += (s, idx) => ShowPage(idx);
+            Controls.Add(_nav);
 
             // 内容区
             for (int i = 0; i < 4; i++)
@@ -79,7 +86,7 @@ namespace QuotaMonitor.UI
                 {
                     Location = new Point(ContentLeft, ContentTop),
                     Size = new Size(ContentW, ClientSize.Height - ContentTop - 60),
-                    BackColor = _dark ? Color.FromArgb(0x1E, 0x1E, 0x22) : Color.FromArgb(0xF7, 0xF7, 0xF9)
+                    BackColor = _dark ? Color.FromArgb(0x2D, 0x2D, 0x2D) : Color.FromArgb(0xF3, 0xF3, 0xF3)
                 };
                 Controls.Add(_pages[i]);
                 _pages[i].Visible = (i == 0);
@@ -110,20 +117,82 @@ namespace QuotaMonitor.UI
             };
             Controls.Add(btnOpenData);
 
+            // 调试模式（设置 → 其他 → 界面调试模式 开启，重启生效）：控件定位用
+            if (_ctx.Config.DebugMode)
+            {
+                DebugProbe.Attach(this, _dark);
+                DebugProbe.Dump(this, "settings_controls.txt");
+            }
+
             var lblVersion = new Label
             {
                 AutoSize = true,
                 Text = "v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3),
                 Location = new Point(ContentLeft + ContentW - 55, footerY + 6),
-                ForeColor = _dark ? Color.FromArgb(0x66, 0x66, 0x66) : Color.FromArgb(0xAA, 0xAA, 0xAA)
+                ForeColor = _dark ? Color.FromArgb(0x7A, 0x7A, 0x7A) : Color.FromArgb(0x9D, 0x9D, 0x9D),
+                Tag = "version"
             };
             Controls.Add(lblVersion);
+
+            // 跟随系统深浅色切换（运行时自动同步）
+            SystemTheme.Changed += (s, e) => ApplyTheme();
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            DarkTitleBar.Apply(Handle);
+            DarkTitleBar.Apply(Handle, _dark);
+        }
+
+        /// <summary>跟随系统深浅色切换：重建配色并重绘全部控件。</summary>
+        private void ApplyTheme()
+        {
+            bool dark = SystemTheme.IsDark();
+            if (_dark == dark) return;
+            _dark = dark;
+
+            BackColor = _dark ? DarkBg : LightBg;
+            ForeColor = _dark ? DarkFg : LightFg;
+            foreach (var p in _pages) p.BackColor = _dark ? Color.FromArgb(0x2D, 0x2D, 0x2D) : Color.FromArgb(0xF3, 0xF3, 0xF3);
+            _nav?.ApplyTheme(dark);
+
+            foreach (Control c in Controls) ApplyControlTheme(c, dark);
+            DarkTitleBar.Apply(Handle, dark);
+        }
+
+        /// <summary>递归应用主题到各类控件（Modern 控件调 ApplyTheme，普通控件按 Tag 角色重设色）。</summary>
+        private void ApplyControlTheme(Control c, bool dark)
+        {
+            switch (c)
+            {
+                case ModernSlider s: s.ApplyTheme(dark); break;
+                case ModernCheckBox cb: cb.ApplyTheme(dark); break;
+                case ModernComboBox cmb: cmb.ApplyTheme(dark); break;
+                case CardButton b: b.ApplyTheme(dark); break;
+                case TextBox tb:
+                    tb.BackColor = dark ? DarkInputBg : Color.White;
+                    tb.ForeColor = dark ? DarkInputFg : LightFg;
+                    break;
+                case NumericUpDown n:
+                    n.BackColor = dark ? DarkInputBg : Color.White;
+                    n.ForeColor = dark ? DarkInputFg : LightFg;
+                    break;
+                case Label lbl:
+                    if (lbl.Tag is string role)
+                    {
+                        lbl.ForeColor = role == "caption" ? (dark ? DarkCaption : LightCaption)
+                            : role == "status" ? (dark ? DarkMuted : LightMuted)
+                            : role == "accent" ? AccentBlue
+                            : role == "version" ? (dark ? Color.FromArgb(0x7A, 0x7A, 0x7A) : Color.FromArgb(0x9D, 0x9D, 0x9D))
+                            : (dark ? DarkFg : LightFg);
+                    }
+                    break;
+                case Panel pn:
+                    if (pn.Tag as string == "sep")
+                        pn.BackColor = dark ? Color.FromArgb(0x40, 0x40, 0x40) : Color.FromArgb(0xE5, 0xE5, 0xE5);
+                    break;
+            }
+            foreach (Control child in c.Controls) ApplyControlTheme(child, dark);
         }
 
         private void ShowPage(int index)
@@ -141,7 +210,8 @@ namespace QuotaMonitor.UI
                 Text = text,
                 AutoSize = true,
                 Location = new Point(4, y),
-                ForeColor = _dark ? Color.FromArgb(0xBB, 0xBB, 0xBB) : Color.FromArgb(0x55, 0x55, 0x55)
+                ForeColor = _dark ? DarkCaption : LightCaption,
+                Tag = "caption"
             };
             page.Controls.Add(lbl);
             return lbl;
@@ -156,7 +226,8 @@ namespace QuotaMonitor.UI
                 AutoSize = true,
                 Location = new Point(360, y + 2),
                 ForeColor = AccentBlue,
-                Font = new Font(Font.FontFamily, 9f, FontStyle.Bold)
+                Font = new Font(Font.FontFamily, 9f, FontStyle.Bold),
+                Tag = "accent"
             };
             page.Controls.Add(valueLabel);
 
@@ -239,7 +310,8 @@ namespace QuotaMonitor.UI
                 Location = new Point(4, y),
                 Width = ContentW - 12,
                 Height = 22,
-                ForeColor = _dark ? Color.FromArgb(0x88, 0x88, 0x88) : Color.Gray
+                ForeColor = _dark ? DarkMuted : LightMuted,
+                Tag = "status"
             };
             page.Controls.Add(lbl);
             y += 28;
@@ -286,7 +358,8 @@ namespace QuotaMonitor.UI
                 Text = "元",
                 AutoSize = true,
                 Location = new Point(198, y + 4),
-                ForeColor = _dark ? Color.FromArgb(0x88, 0x88, 0x88) : Color.Gray
+                ForeColor = _dark ? DarkMuted : LightMuted,
+                Tag = "status"
             });
             numThreshold.ValueChanged += (s, e) =>
             {
@@ -323,7 +396,8 @@ namespace QuotaMonitor.UI
             {
                 Location = new Point(4, y),
                 Size = new Size(ContentW - 8, 1),
-                BackColor = _dark ? Color.FromArgb(0x35, 0x35, 0x3A) : Color.FromArgb(0xDD, 0xDD, 0xE0)
+                BackColor = _dark ? Color.FromArgb(0x40, 0x40, 0x40) : Color.FromArgb(0xE5, 0xE5, 0xE5),
+                Tag = "sep"
             };
             p.Controls.Add(sep);
             y += 16;
@@ -366,6 +440,12 @@ namespace QuotaMonitor.UI
             {
                 _ctx.Config.AutoStart = v;
                 AutoStartService.SetEnabled(v);
+                MarkDirty();
+            });
+
+            AddCheckRow(p, "界面调试模式（控件定位，重启生效）", _ctx.Config.DebugMode, ref y, v =>
+            {
+                _ctx.Config.DebugMode = v;
                 MarkDirty();
             });
         }

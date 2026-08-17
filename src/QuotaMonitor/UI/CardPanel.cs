@@ -14,15 +14,15 @@ namespace QuotaMonitor.UI
         private string _title = "";
         private int _cornerRadius = 10;
 
-        // 颜色方案
-        private static readonly Color DarkCardBg = Color.FromArgb(0x25, 0x25, 0x28);
-        private static readonly Color DarkCardBorder = Color.FromArgb(0x3A, 0x3A, 0x3F);
-        private static readonly Color DarkTitleFg = Color.FromArgb(0xAA, 0xAA, 0xAA);
-        private static readonly Color LightCardBg = Color.FromArgb(0xF7, 0xF7, 0xF7);
+        // 颜色方案（Win11 风格）
+        private static readonly Color DarkCardBg = Color.FromArgb(0x2D, 0x2D, 0x2D);
+        private static readonly Color DarkCardBorder = Color.FromArgb(0x40, 0x40, 0x40);
+        private static readonly Color DarkTitleFg = Color.FromArgb(0xA0, 0xA0, 0xA0);
+        private static readonly Color LightCardBg = Color.FromArgb(0xF3, 0xF3, 0xF3);
         private static readonly Color LightCardBorder = Color.FromArgb(0xE0, 0xE0, 0xE0);
-        private static readonly Color LightTitleFg = Color.FromArgb(0x88, 0x88, 0x88);
+        private static readonly Color LightTitleFg = Color.FromArgb(0x6E, 0x6E, 0x6E);
 
-        private readonly bool _dark;
+        private bool _dark;
 
         public string Title
         {
@@ -34,6 +34,14 @@ namespace QuotaMonitor.UI
         {
             get => _cornerRadius;
             set { _cornerRadius = value; Invalidate(); }
+        }
+
+        /// <summary>切换深浅色主题并重绘（系统主题变化时窗口调用）。</summary>
+        public void ApplyTheme(bool dark)
+        {
+            if (_dark == dark) return;
+            _dark = dark;
+            Invalidate();
         }
 
         public CardPanel(bool dark)
@@ -108,16 +116,16 @@ namespace QuotaMonitor.UI
     /// </summary>
     public class CardButton : Button
     {
-        private readonly bool _dark;
+        private bool _dark;
         private bool _hovered;
         private bool _pressed;
 
-        // 颜色
-        private static readonly Color DarkBtnBg = Color.FromArgb(0x33, 0x33, 0x38);
-        private static readonly Color DarkBtnHover = Color.FromArgb(0x40, 0x40, 0x48);
-        private static readonly Color DarkBtnPressed = Color.FromArgb(0x28, 0x28, 0x2C);
-        private static readonly Color DarkBtnFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
-        private static readonly Color DarkBtnBorder = Color.FromArgb(0x50, 0x50, 0x55);
+        // 颜色（Win11 风格）
+        private static readonly Color DarkBtnBg = Color.FromArgb(0x32, 0x32, 0x32);
+        private static readonly Color DarkBtnHover = Color.FromArgb(0x3D, 0x3D, 0x3D);
+        private static readonly Color DarkBtnPressed = Color.FromArgb(0x28, 0x28, 0x28);
+        private static readonly Color DarkBtnFg = Color.FromArgb(0xE0, 0xE0, 0xE0);
+        private static readonly Color DarkBtnBorder = Color.FromArgb(0x4A, 0x4A, 0x4A);
 
         private static readonly Color LightBtnBg = Color.FromArgb(0xE8, 0xE8, 0xE8);
         private static readonly Color LightBtnHover = Color.FromArgb(0xDB, 0xDB, 0xDB);
@@ -125,12 +133,20 @@ namespace QuotaMonitor.UI
         private static readonly Color LightBtnFg = Color.FromArgb(0x33, 0x33, 0x33);
         private static readonly Color LightBtnBorder = Color.FromArgb(0xC0, 0xC0, 0xC0);
 
-        // 强调色按钮（如"应用"）
-        private static readonly Color AccentBg = Color.FromArgb(0x1F, 0x6F, 0xEB);
-        private static readonly Color AccentHover = Color.FromArgb(0x2B, 0x7D, 0xF5);
-        private static readonly Color AccentPressed = Color.FromArgb(0x18, 0x5C, 0xC7);
+        // 强调色按钮（如"应用"）——Win11 强调蓝
+        private static readonly Color AccentBg = Color.FromArgb(0x00, 0x67, 0xC0);
+        private static readonly Color AccentHover = Color.FromArgb(0x0B, 0x76, 0xD4);
+        private static readonly Color AccentPressed = Color.FromArgb(0x00, 0x54, 0xA0);
 
         public bool IsAccent { get; set; }
+
+        /// <summary>切换深浅色主题并重绘（系统主题变化时窗口调用）。</summary>
+        public void ApplyTheme(bool dark)
+        {
+            if (_dark == dark) return;
+            _dark = dark;
+            Invalidate();
+        }
 
         public CardButton(bool dark, string text, int width = 75, int height = 30)
         {

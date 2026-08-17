@@ -59,5 +59,8 @@ namespace QuotaMonitor.Core
 
         /// <summary>悬浮窗圆角大小（像素，0=直角）。</summary>
         public int CornerRadius { get; set; } = 16;
+
+        /// <summary>界面调试模式（控件定位用）：开启后各页面挂载 Tooltip/悬停高亮，重启应用生效。</summary>
+        public bool DebugMode { get; set; } = false;
     }
 }

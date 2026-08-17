@@ -12,15 +12,24 @@ namespace QuotaMonitor.UI
     {
         public event EventHandler<bool> CheckedChanged;
 
-        private readonly bool _dark;
+        private bool _dark;
         private bool _checked;
         private bool _hovered;
 
-        private static readonly Color AccentBlue = Color.FromArgb(0x1F, 0x6F, 0xEB);
+        // 配色（Win11 风格）
+        private static readonly Color AccentBlue = Color.FromArgb(0x00, 0x67, 0xC0);
         private static readonly Color DarkBorder = Color.FromArgb(0x5A, 0x5A, 0x60);
         private static readonly Color LightBorder = Color.FromArgb(0xAA, 0xAA, 0xAE);
         private static readonly Color DarkFg = Color.FromArgb(0xBB, 0xBB, 0xBB);
         private static readonly Color LightFg = Color.FromArgb(0x55, 0x55, 0x55);
+
+        /// <summary>切换深浅色主题并重绘（系统主题变化时窗口调用）。</summary>
+        public void ApplyTheme(bool dark)
+        {
+            if (_dark == dark) return;
+            _dark = dark;
+            Invalidate();
+        }
 
         public bool Checked
         {

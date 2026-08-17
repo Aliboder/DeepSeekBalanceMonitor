@@ -12,23 +12,32 @@ namespace QuotaMonitor.UI
     {
         public event EventHandler<int> ItemSelected;
 
-        private readonly bool _dark;
+        private bool _dark;
         private readonly string[] _items = { "显示", "提醒", "密钥", "其他" };
         private int _selectedIndex;
         private int _hoverIndex = -1;
 
-        // 配色
-        private static readonly Color DarkSideBg = Color.FromArgb(0x20, 0x20, 0x24);
-        private static readonly Color LightSideBg = Color.FromArgb(0xE9, 0xE9, 0xEC);
-        private static readonly Color AccentBlue = Color.FromArgb(0x1F, 0x6F, 0xEB);
+        // 配色（Win11 风格）
+        private static readonly Color DarkSideBg = Color.FromArgb(0x20, 0x20, 0x20);
+        private static readonly Color LightSideBg = Color.FromArgb(0xEB, 0xEB, 0xEB);
+        private static readonly Color AccentBlue = Color.FromArgb(0x00, 0x67, 0xC0);
         private static readonly Color AccentLight = Color.FromArgb(0xE3, 0xEE, 0xFC);
 
-        private static readonly Color DarkItemFg = Color.FromArgb(0xBB, 0xBB, 0xBB);
+        private static readonly Color DarkItemFg = Color.FromArgb(0xA0, 0xA0, 0xA0);
         private static readonly Color DarkItemFgSel = Color.White;
-        private static readonly Color DarkHoverBg = Color.FromArgb(0x2E, 0x2E, 0x33);
+        private static readonly Color DarkHoverBg = Color.FromArgb(0x36, 0x36, 0x36);
         private static readonly Color LightItemFg = Color.FromArgb(0x55, 0x55, 0x55);
-        private static readonly Color LightItemFgSel = Color.FromArgb(0x1F, 0x6F, 0xEB);
-        private static readonly Color LightHoverBg = Color.FromArgb(0xDD, 0xDD, 0xE0);
+        private static readonly Color LightItemFgSel = Color.FromArgb(0x00, 0x67, 0xC0);
+        private static readonly Color LightHoverBg = Color.FromArgb(0xE0, 0xE0, 0xE0);
+
+        /// <summary>切换深浅色主题并重绘（系统主题变化时窗口调用）。</summary>
+        public void ApplyTheme(bool dark)
+        {
+            if (_dark == dark) return;
+            _dark = dark;
+            BackColor = _dark ? DarkSideBg : LightSideBg;
+            Invalidate();
+        }
 
         public int SelectedIndex
         {

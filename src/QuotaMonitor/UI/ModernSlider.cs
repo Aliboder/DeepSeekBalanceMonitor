@@ -13,16 +13,24 @@ namespace QuotaMonitor.UI
         public event EventHandler<int> ValueChanged;
         public event EventHandler DragEnded;
 
-        private readonly bool _dark;
+        private bool _dark;
         private int _min, _max, _value;
         private bool _dragging;
 
-        // 配色
-        private static readonly Color AccentBlue = Color.FromArgb(0x1F, 0x6F, 0xEB);
-        private static readonly Color DarkTrack = Color.FromArgb(0x3A, 0x3A, 0x40);
-        private static readonly Color LightTrack = Color.FromArgb(0xD5, 0xD5, 0xD9);
+        // 配色（Win11 风格）
+        private static readonly Color AccentBlue = Color.FromArgb(0x00, 0x67, 0xC0);
+        private static readonly Color DarkTrack = Color.FromArgb(0x3D, 0x3D, 0x3D);
+        private static readonly Color LightTrack = Color.FromArgb(0xD9, 0xD9, 0xD9);
         private static readonly Color DarkKnob = Color.FromArgb(0xE8, 0xE8, 0xE8);
         private static readonly Color LightKnob = Color.White;
+
+        /// <summary>切换深浅色主题并重绘（系统主题变化时窗口调用）。</summary>
+        public void ApplyTheme(bool dark)
+        {
+            if (_dark == dark) return;
+            _dark = dark;
+            Invalidate();
+        }
 
         public int Minimum { get => _min; set { _min = value; Invalidate(); } }
         public int Maximum { get => _max; set { _max = value; Invalidate(); } }

@@ -12,20 +12,31 @@ namespace QuotaMonitor.UI
     {
         public event EventHandler<int> SelectedIndexChanged;
 
-        private readonly bool _dark;
+        private bool _dark;
         private readonly ListBox _list;
         private readonly ToolStripDropDown _dropDown;
         private readonly string[] _items;
         private int _selectedIndex = -1;
         private bool _hovered;
 
-        private static readonly Color AccentBlue = Color.FromArgb(0x1F, 0x6F, 0xEB);
-        private static readonly Color DarkBg = Color.FromArgb(0x2D, 0x2D, 0x30);
+        // 配色（Win11 风格）
+        private static readonly Color AccentBlue = Color.FromArgb(0x00, 0x67, 0xC0);
+        private static readonly Color DarkBg = Color.FromArgb(0x32, 0x32, 0x32);
         private static readonly Color LightBg = Color.White;
-        private static readonly Color DarkBorder = Color.FromArgb(0x50, 0x50, 0x55);
-        private static readonly Color LightBorder = Color.FromArgb(0xC0, 0xC0, 0xC4);
+        private static readonly Color DarkBorder = Color.FromArgb(0x4A, 0x4A, 0x4A);
+        private static readonly Color LightBorder = Color.FromArgb(0xC7, 0xC7, 0xC7);
         private static readonly Color DarkFg = Color.FromArgb(0xDD, 0xDD, 0xDD);
         private static readonly Color LightFg = Color.FromArgb(0x33, 0x33, 0x33);
+
+        /// <summary>切换深浅色主题并重绘（系统主题变化时窗口调用）。</summary>
+        public void ApplyTheme(bool dark)
+        {
+            if (_dark == dark) return;
+            _dark = dark;
+            _list.BackColor = _dark ? Color.FromArgb(0x32, 0x32, 0x32) : Color.White;
+            _list.ForeColor = _dark ? DarkFg : LightFg;
+            Invalidate();
+        }
 
         public int SelectedIndex
         {

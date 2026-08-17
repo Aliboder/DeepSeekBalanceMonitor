@@ -16,7 +16,7 @@ namespace QuotaMonitor.UI
             if (dark)
             {
                 menu.Renderer = new DarkMenuRenderer();
-                SetItemColors(menu.Items, Color.FromArgb(0x2D, 0x2D, 0x30), Color.FromArgb(0xE6, 0xE6, 0xE6));
+                SetItemColors(menu.Items, Color.FromArgb(0x2D, 0x2D, 0x2D), Color.FromArgb(0xE6, 0xE6, 0xE6));
             }
             else
             {
@@ -39,28 +39,28 @@ namespace QuotaMonitor.UI
         }
     }
 
-    /// <summary>深色菜单配色表。</summary>
+    /// <summary>深色菜单配色表（Win11 风格）。</summary>
     public class DarkMenuColorTable : ProfessionalColorTable
     {
-        public override Color MenuItemSelected => Color.FromArgb(0x3E, 0x3E, 0x42);
-        public override Color MenuItemBorder => Color.FromArgb(0x3E, 0x3E, 0x42);
-        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(0x3E, 0x3E, 0x42);
-        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(0x3E, 0x3E, 0x42);
-        public override Color ToolStripDropDownBackground => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color MenuBorder => Color.FromArgb(0x3F, 0x3F, 0x46);
-        public override Color ImageMarginGradientBegin => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color ImageMarginGradientMiddle => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color ImageMarginGradientEnd => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color SeparatorDark => Color.FromArgb(0x3F, 0x3F, 0x46);
-        public override Color SeparatorLight => Color.FromArgb(0x3F, 0x3F, 0x46);
-        public override Color MenuStripGradientBegin => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color MenuStripGradientEnd => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color ToolStripGradientBegin => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color ToolStripGradientMiddle => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color ToolStripGradientEnd => Color.FromArgb(0x2D, 0x2D, 0x30);
-        public override Color CheckBackground => Color.FromArgb(0x3E, 0x3E, 0x42);
-        public override Color CheckSelectedBackground => Color.FromArgb(0x3E, 0x3E, 0x42);
-        public override Color CheckPressedBackground => Color.FromArgb(0x3E, 0x3E, 0x42);
+        public override Color MenuItemSelected => Color.FromArgb(0x3D, 0x3D, 0x3D);
+        public override Color MenuItemBorder => Color.FromArgb(0x3D, 0x3D, 0x3D);
+        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(0x3D, 0x3D, 0x3D);
+        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(0x3D, 0x3D, 0x3D);
+        public override Color ToolStripDropDownBackground => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color MenuBorder => Color.FromArgb(0x40, 0x40, 0x40);
+        public override Color ImageMarginGradientBegin => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color ImageMarginGradientMiddle => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color ImageMarginGradientEnd => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color SeparatorDark => Color.FromArgb(0x40, 0x40, 0x40);
+        public override Color SeparatorLight => Color.FromArgb(0x40, 0x40, 0x40);
+        public override Color MenuStripGradientBegin => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color MenuStripGradientEnd => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color ToolStripGradientBegin => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color ToolStripGradientMiddle => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color ToolStripGradientEnd => Color.FromArgb(0x2D, 0x2D, 0x2D);
+        public override Color CheckBackground => Color.FromArgb(0x3D, 0x3D, 0x3D);
+        public override Color CheckSelectedBackground => Color.FromArgb(0x3D, 0x3D, 0x3D);
+        public override Color CheckPressedBackground => Color.FromArgb(0x3D, 0x3D, 0x3D);
     }
 
     public class DarkMenuRenderer : ToolStripProfessionalRenderer
