@@ -108,6 +108,7 @@ namespace QuotaMonitor.Core
             public bool LockMode { get; set; }
             public bool TopMost { get; set; }
             public bool ShowRemaining { get; set; } = true;
+            public int CornerRadius { get; set; }
             public int? FloatX { get; set; }
             public int? FloatY { get; set; }
             public int? StatsW { get; set; }
@@ -128,6 +129,7 @@ namespace QuotaMonitor.Core
                 LockMode = c.LockMode,
                 TopMost = c.TopMost,
                 ShowRemaining = c.ShowRemaining,
+                CornerRadius = c.CornerRadius,
                 FloatX = c.FloatPosition?.X,
                 FloatY = c.FloatPosition?.Y,
                 StatsW = c.StatsSize?.Width,
@@ -147,6 +149,7 @@ namespace QuotaMonitor.Core
                 LockMode = LockMode,
                 TopMost = TopMost,
                 ShowRemaining = ShowRemaining,
+                CornerRadius = Normalize(CornerRadius, 0, 30, 16),
                 FloatPosition = (FloatX.HasValue && FloatY.HasValue)
                     ? new System.Drawing.Point(FloatX.Value, FloatY.Value)
                     : (System.Drawing.Point?)null,

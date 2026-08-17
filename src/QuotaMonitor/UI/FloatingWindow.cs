@@ -67,6 +67,17 @@ namespace QuotaMonitor.UI
             if (_balanceFont != null) _balanceFont.Dispose();
             _balanceFont = new Font("Microsoft YaHei UI", cfg.FontSize, FontStyle.Bold);
 
+            // 圆角：设置页可调（0=直角），句柄已创建时立即重绘
+            if (cfg.CornerRadius != _cornerRadius)
+            {
+                _cornerRadius = cfg.CornerRadius;
+                if (IsHandleCreated)
+                {
+                    UpdateRegion();
+                    Refresh();
+                }
+            }
+
             UpdateSize();
 
             TopMost = cfg.TopMost;
@@ -261,8 +272,14 @@ namespace QuotaMonitor.UI
 
         private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
         {
-            int d = radius * 2;
             var path = new GraphicsPath();
+            if (radius <= 0)
+            {
+                // 直角（radius=0）：AddArc 不接受 0 尺寸，直接画矩形
+                path.AddRectangle(bounds);
+                return path;
+            }
+            int d = radius * 2;
             path.AddArc(bounds.X, bounds.Y, d, d, 180, 90);
             path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 90);
             path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);

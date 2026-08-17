@@ -56,5 +56,8 @@ namespace QuotaMonitor.Core
 
         /// <summary>套餐窗口显示模式：true=剩余额度，false=已用额度。</summary>
         public bool ShowRemaining { get; set; } = true;
+
+        /// <summary>悬浮窗圆角大小（像素，0=直角）。</summary>
+        public int CornerRadius { get; set; } = 16;
     }
 }

@@ -255,6 +255,7 @@ namespace QuotaMonitor.UI
             AddSliderRow(p, "字体大小", 12, 48, _ctx.Config.FontSize, ref y, v => v + " 号");
             AddSliderRow(p, "整体透明度", 30, 100, _ctx.Config.Opacity, ref y, v => v + " %");
             AddSliderRow(p, "鼠标离开暗度", 10, 100, _ctx.Config.IdleOpacity, ref y, v => v + " %");
+            AddSliderRow(p, "悬浮窗圆角", 0, 30, _ctx.Config.CornerRadius, ref y, v => v + " px");
             AddCheckRow(p, "套餐窗口显示剩余额度（关闭则显示已用额度）", _ctx.Config.ShowRemaining, ref y,
                 v => { _ctx.Config.ShowRemaining = v; _ctx.FloatWindow.UpdateDisplay(); MarkDirty(); });
         }
@@ -386,6 +387,11 @@ namespace QuotaMonitor.UI
             else if (caption == "鼠标离开暗度")
             {
                 cfg.IdleOpacity = value;
+                _ctx.FloatWindow.ApplyConfig();
+            }
+            else if (caption == "悬浮窗圆角")
+            {
+                cfg.CornerRadius = value;
                 _ctx.FloatWindow.ApplyConfig();
             }
             MarkDirty();
