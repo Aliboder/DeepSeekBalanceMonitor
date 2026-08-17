@@ -27,7 +27,7 @@ UI 调试中有一类高频问题：
 2. **元素自述** —— 每个元素能报告自己的元数据
 3. **交互探测** —— 悬停/点击时高亮并显示该元素信息
 
-加一句总原则：**这套探测是临时的，定位完成后必须整体移除，不进入正式代码**。
+加一句总原则：**这套探测能力常驻代码库、由单一开关掌控；用时开、用完关，不干扰正式界面**（详见第四节）。
 
 ## 三、三件套（通用方法论）
 
@@ -72,39 +72,43 @@ UI 调试中有一类高频问题：
 
 ### 设计
 
-- 一个**全局开关**（静态字段 / 常量 / 环境变量 / feature flag），默认关闭
+- 一个**全局开关**（静态字段 / 常量 / 环境变量 / **用户设置项**），默认关闭
 - 每个页面在构造（或初始化）时统一检查：`if (Enabled) Attach(root)`
 - 开关**集中在一处**，全软件统一控制，不需要逐页改动
+- 开关位置因项目而异：**个人工具可以放进设置界面**，让使用者自己开，省去"改代码 → 重新构建"的流程
 
 ```csharp
-// 全局调试开关：问题排查时置 true，排查完置 false（保持 false 进入正式版本）
-public static bool DebugEnabled = false;
+// WinForms 落地（本项目实际做法）：开关即用户设置项
+public bool DebugMode { get; set; } = false;   // Config.cs
 
 // 任意页面构造末尾：
-if (DebugEnabled)
+if (ctx.Config.DebugMode)
 {
     AttachControls(this);      // 挂标识 + Tooltip + 高亮
     DumpControls(this, "page.txt");  // 导出控件树快照
 }
 ```
 
+> 本项目进阶：设置页勾选「界面调试模式」时**即时生效**——对已打开的页面（如统计面板）通过 `AttachDebugProbe()` 补挂探针，无需重启应用。
+
 ### 使用流程
 
-1. 需要定位时：**全局开关置 `true`** → 重新构建 → 各页面自动挂载探测
+1. 需要定位时：**设置 → 打开调试开关** → 各页面（已打开的也即时补挂）挂载探测
 2. 悬停 / 导出 → 定位根因 → 修复
-3. 排查完：**全局开关置 `false`** → 重新构建 → 恢复正常界面
+3. 排查完：**设置 → 关闭开关** → 恢复正常界面（探测代码仍常驻，随开关开关）
 
 ### 好处
 
 - **零痕迹**：关闭时正式界面无任何调试开销与干扰
-- **零改动成本**：下次换页面出问题，只改一个开关即可全软件生效
+- **零改动成本**：下次换页面出问题，只动开关即可全软件生效，**普通用户也能自助开启**
 - **AI 可复用**：文档里明确"开关在哪、怎么开怎么关"，AI 按步骤执行即可
 
 ### 跨技术栈落点
 
 | 技术栈 | 总开关实现 |
 |--------|-----------|
-| WinForms / WPF / Qt | 静态字段（如 `DebugProbe.Enabled`），页面构造检查 |
+| WinForms（本项目） | 用户设置项 `Config.DebugMode`（设置 → 其他 → 界面调试模式），构造检查 + 设置页补挂已打开页面 |
+| WPF / Qt | 静态字段，页面构造检查；或做成设置项 |
 | Web / React / Vue | 构建期环境变量（`import.meta.env.DEV` / `process.env.NODE_ENV`）或运行时 flag |
 | Flutter | `kDebugMode` 或自定义全局常量 |
 
@@ -116,7 +120,7 @@ if (DebugEnabled)
 2. **悬停异常区域** → 读标识与坐标，确认"这是哪个元素"
 3. **导出 UI 树** → 对照坐标 / 内容，反查它在代码里的创建位置
 4. **分析可见性逻辑**：它"何时出现 / 何时消失"？→ 判断是否由数据或状态驱动、是否有状态切换 bug
-5. **修复** → **删除全部探测代码**，保留正式逻辑
+5. **修复** → **关闭调试开关**，保留正式逻辑（探测能力常驻，随开关启用/关闭）
 
 ## 五、通用陷阱（任何技术栈都会遇到）
 
@@ -134,13 +138,15 @@ if (DebugEnabled)
 
 6. **透明背景元素遮挡兄弟元素（视觉假象）**：背景透明的元素，其矩形区域会显示为父容器背景色。它盖住兄弟元素时，视觉上是一块"背景色块"（像黑条/白条），容易误判为"多了一块东西"，实则是透明元素的矩形范围。
 
+7. **控件基类自绘矩形底色盖不掉（自绘叠加踩坑）**：WinForms 的 `Label` / `Panel` 在 `Paint` 事件**之前**，基类就用 `BackColor` 渲染了一整块矩形背景。想在 `Paint` 里画圆角/自绘来"盖住"它，无论 `SkipFill`、`SetClip` 裁剪还是自定义 `Label` 子类，都去不掉底层那块矩形——**画出来的只是叠加在矩形上的一层**。正确解法是结构性移除子控件：把自绘内容直接画进**父容器**的 `Paint` 事件里（本项目状态徽章即如此：删除 `Label` 子控件，改由卡片 Panel 的 `Paint` 事件画圆角胶囊），从根上消灭"控件矩形底色"。遇到"自绘之上还有一层矩形/色块"时，先怀疑基类背景，别在 `Paint` 里跟它对抗。
+
 ## 六、落点速查（具体技术栈怎么实现）
 
 思路通用，落点各异：
 
 | 技术栈 | 唯一标识 | 元素自述 | 交互探测 |
 |--------|---------|---------|---------|
-| **WinForms** | 遍历 `Controls` 赋 `Name` | 递归读 `Location/Size/Text/Visible` 写文件 | 挂 `Tooltip`(InitialDelay=0) + `MouseEnter/MouseLeave` 改 `BackColor` |
+| **WinForms** | 遍历 `Controls` 赋 `Name` | 递归读 `Location/Size/Text/Visible` 写文件 | 挂 `Tooltip`(InitialDelay=0) + `MouseEnter/MouseLeave` 改 `BackColor`；开关见设置 → 其他 → 界面调试模式 |
 | **WPF** | `Name` / `x:Name`，或遍历 VisualTree | `ActualWidth/Height`、`TransformToAncestor` 算屏幕坐标 | 也可用现成工具 **Snoop / Live Visual Tree** |
 | **Web / React** | `id` / `data-*` / DevTools 元素节点 | `getBoundingClientRect()` 批量打印 | DevTools Elements 悬停自动高亮 + 属性面板 |
 | **Qt** | `objectName` | `geometry()` / `isVisible()` | 悬停 `setStyleSheet` 高亮 + `QToolTip` |
